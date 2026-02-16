@@ -64,6 +64,9 @@ func main() {
 	fmt.Println(age3)
 
 	//panic:
-	printIntValue(11)
+	printIntValue(9)
+
+	// control structures:
+	controls()
 
 }
