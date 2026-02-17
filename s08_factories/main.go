@@ -1,4 +1,4 @@
-package data
+package main
 
 import (
 	"fmt"
@@ -34,4 +34,25 @@ func main() {
 	rahul := teacher.New("rahul", "kumar")
 	fmt.Println(rahul)
 
+	// another example printing the course:
+	goCourse := Course{Name: "Go course", Instructor: kyle}
+	fmt.Println(goCourse)
+
+	// we can print this goCourse in its String way as:
+	fmt.Println(goCourse.String())
+	/*
+		NOTE :	why the above output 'fmt.Println(goCourse)' has the same output as 'fmt.Println(goCourse.String())' ?
+		 Answer : Ah! That's because of implicit interface implementation in Go.
+			The Course type has a String() method defined (in course.go). In Go, when a type implements the Stringer interface (which requires a String() string method), the fmt package automatically calls it—even if you don't explicitly invoke .String().
+			So when you call fmt.Println(goCourse):
+			fmt.Println checks if goCourse implements the Stringer interface
+			It finds the String() method on the Course type
+			It automatically calls goCourse.String() internally to get the formatted output
+			That's why your output on line 39 is formatted nicely instead of showing the raw struct. It's the same reason line 42 (fmt.Println(goCourse.String())) produces identical output—the explicit call just makes it obvious.
+	*/
+
+	/*
+		q: What is the method name used in Go for custom string representation (similar to toString in other languages)?
+		a: The String() method is used to define a custom string representation for a type
+	*/
 }
