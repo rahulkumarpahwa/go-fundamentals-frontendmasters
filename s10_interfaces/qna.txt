@@ -1,0 +1,14 @@
+What is an interface in Go?
+An interface in Go is a definition of methods, a list of methods without implementation, that can be implicitly implemented by types that have methods matching the interface's signature.
+
+How does Go handle interface implementation?
+In Go, interface implementation is implicit. Any type with methods matching the interface's signature automatically implements the interface, without requiring an explicit 'implements' declaration.
+
+What is the syntax for defining an interface in Go?
+An interface is defined using the type keyword, followed by an interface name, the interface keyword, and a list of method signatures without implementation, enclosed in curly braces.
+
+How can interfaces enable polymorphism in Go?
+Interfaces enable polymorphism by allowing different types to be stored in the same collection and treated uniformly based on their shared method signatures, without knowing their specific type.
+
+What does the range keyword do in a Go for loop?
+The range keyword in a Go for loop allows iterating over collections like arrays, slices, or maps, providing both the index and the element in each iteration. Using an underscore allows skipping the index if not needed.
