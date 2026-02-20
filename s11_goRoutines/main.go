@@ -8,7 +8,7 @@ import (
 func printMessage(text string) {
 	for i := 0; i < 5; i++ {
 		fmt.Println(text)
-		time.Sleep(1 * time.Second)
+		time.Sleep(800 * time.Millisecond)
 		// as we are waiting we have nothing to do and we are wasting the meantime.
 	}
 }
@@ -21,9 +21,23 @@ func main() {
 	// sometimes, they are being executed at the same time or It depends on the west, it depends on if you're multicore, if they'reactually really running at the same time or it's speaking from one or the other.Anyway, it feels like we have different lines of execution running atthe same time.
 
 	// now, to make the goroutine work just add the keyword 'go' in front.
-	
-}
+	go printMessage("Golang is the Great!")
+	go printMessage("Typescript is the Great!")
+	go printMessage("Js is great!")
 
+	for { // inifinite loop, to keep the main function busy until all the go routine gets completed.
+	}
+
+	// goroutine is the kind of the thread.
+	// first we have the main goroutine, which is always executed.
+	// then we can open other gorotuine from there. there can be any number of goroutine which can be opened from there. It's like opening three apps at the same time.
+
+	// They're using the same shared space,which may lead to some problems with memory management.What happens if one of those Goroutines is saving a value on a variable thatother Goroutines at the same time trying to read the value, okay?You can lock and unlock and do things but there is a better way.
+
+	// And that leads to another question.And what's the lifecycle of my app?When my app ends?When my Go app ends?My app ends when the main Goroutine ends.When the main Go in, the routine ends when it reaches the end of the main function.Now I'm opening three more Goroutines.So I have the main goroutine andthree more goroutines that they are doing their job.But the main one has nothing else to do after that.So the whole process end, okay?
+
+
+}
 
 // Description of the situation :
 /*

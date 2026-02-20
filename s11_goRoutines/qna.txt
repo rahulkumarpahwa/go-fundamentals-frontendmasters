@@ -1,0 +1,14 @@
+What is a goroutine in Go?
+A goroutine is the Go way of using threads, which is a lightweight thread that allows concurrent execution of functions by adding the 'go' keyword before a function call
+
+How does a Go application's lifecycle work with goroutines?
+The application ends when the main goroutine ends. If additional goroutines are created but the main goroutine completes, the entire process will terminate, potentially before other goroutines finish executing
+
+How can you create a goroutine in Go?
+Add the 'go' keyword before a function call, which creates a new lightweight thread of execution that runs concurrently with other goroutines
+
+What package in Go is used for managing time-related operations like sleeping?
+The 'time' package, which provides methods for sleeping and duration calculations using nanoseconds as the base unit
+
+What happens when global variables are accessed across multiple goroutines?
+Goroutines share the same memory space for global and package variables, which can potentially lead to race conditions and synchronization challenges
