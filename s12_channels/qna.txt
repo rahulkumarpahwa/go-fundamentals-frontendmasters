@@ -1,0 +1,22 @@
+What is a channel in Go and how does it facilitate communication between goroutines?
+A channel is a special type of variable that acts as a pipeline for sending and receiving data between goroutines. It allows one goroutine to send a value, while another goroutine can wait and receive that value, effectively providing a mechanism for inter-goroutine communication.
+
+
+How do you create a channel in Go?
+To create a channel, use the chan keyword followed by the type of data the channel will handle, and initialize it using the make() function. For example: channelName := make(chan string) creates a channel that can send and receive string values.
+
+
+What is the syntax for sending and receiving data through a channel?
+To send data through a channel, use the arrow operator (<-) with the channel on the left side: channelName <- value. To receive data, place the channel on the right side of the arrow: receivedValue := <-channelName.
+
+
+What is a buffered channel in Go?
+A buffered channel allows storing a specified number of values before blocking. It is created by providing a second argument to make() that defines the buffer size. For example: bufferedChannel := make(chan string, 2) creates a channel that can hold two values before blocking.
+
+
+Why is closing channels important when working with goroutines?
+Closing channels helps prevent deadlocks and ensures proper resource management. By using the close() function on a channel, you signal that no more values will be sent, allowing receiving goroutines to complete their operations and preventing the program from hanging indefinitely.
+
+What happens when a goroutine tries to send data to a non-buffered channel with no receiver?
+The goroutine will block until a receiver is available
+
