@@ -2,6 +2,7 @@ package api
 
 import (
 	// "errors"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mod13/datatypes" // importing the package
@@ -13,9 +14,10 @@ import (
 // we have imported the package and will get the things from it which are exported only.
 
 // const apiURL = "https://cex.io/api/ticker/BTC/INR" // make the apiURL small case so to make it private to the package.
-const apiURL =  "https://open.er-api.com/v6/latest/%s"
+const apiURL = "https://open.er-api.com/v6/latest/%s"
+
 // I am using the api URL because the api in the lecture is deprecated.
-// This api URL provides the exchange rate to all the currencies which are available on the platform from the currency we pass. 
+// This api URL provides the exchange rate to all the currencies which are available on the platform from the currency we pass.
 
 // const apiURL = "https://cex.io/api/ticker/%s" // make the apiURL small case so to make it private to the package.
 // now, we need to pass the two - 3 letter ISO code of the currency to get the current price of the crypto in that currency. eg. INR for indian rupee and BTC for bitcoin
@@ -50,8 +52,19 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 			return nil, err // wifi, or offline between the transfer error.
 		}
 		// As a JSON string just by calling the string converter.It receives the bytes and it will convert that into a string using UTF eight.
-		json := string(bodyBytes)
-		fmt.Println(json)
+		// data := string(bodyBytes)
+		// fmt.Println(data)
+		// now, instead of printing it, we will parse the json we got.
+
+		var currenyRate datatypes.Rate // here data will be stored by the Unmarshal after we get the from bytes from the ReadAll which has the response body.
+		err = json.Unmarshal(bodyBytes, &currenyRate)
+		// Unmarshal parses the JSON-encoded data and stores the result in the value pointed to by v. If v is nil or not a pointer, Unmarshal returns an InvalidUnmarshalError.
+		// also, here we pass the &currencyRate, so as the function Unmarshal will not use the copy to change but in the actual value itself.
+		if err != nil {
+			return nil, err
+		}
+		// but now the data from the json does not match the currencyRate structure. so, we will create another go file, which will handle the API structure called response.go in the api package. (also in api folder)
+
 	} else { // when server response other than 2xx.
 		// here we need to create the error ourself in case of the response other than 200. so, we will use the "errors" package. this has the fxn 'New' which will create the error with msg we pass.
 		// but we can also use the fmt.Errorf to create the formatted error.
@@ -59,5 +72,5 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 	}
 
 	rate := datatypes.Rate{Currency: currencyUpper, Price: 20} // for now we are taking the temporaray value of 20 for the price.
-	return &rate, nil                                     // we have to return the pointer of type Rate so use the &.
+	return &rate, nil                                          // we have to return the pointer of type Rate so use the &.
 }

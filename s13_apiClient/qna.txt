@@ -74,3 +74,21 @@ Parse the JSON, as it is currently just a string and needs to be converted into 
 
 What issue occurs when initially printing the rate?
 The rate is initially printed as a memory address (pointer) instead of its actual value, requiring further processing to display the desired information.
+
+--lec37--
+What are the two primary JSON-related functions in Go for working with data?
+Marshal and Unmarshal. Marshal shapes data into JSON, while Unmarshal parses JSON and stores it into a specified value.
+
+In Go, when passing a variable to a function and wanting the function to modify the original variable, what must you do?
+Pass the address of the variable (use a pointer) instead of passing the variable itself, which would create a copy.
+
+What is the difference between a constructor and a factory in Go?
+A constructor uses the type with curly braces, while a factory is a function like NewDecoder or NewEncoder that creates and returns an instance.
+
+What type does Go use to represent a generic entity that can hold various kinds of data?
+Value, which is similar to an object or variable in other programming languages and can represent almost any type of data.
+
+What is a common challenge when parsing JSON from an external API into a local data structure?
+The JSON structure might not directly match the local data model, requiring conversion or creating a separate data type to represent the API response.
+
+
