@@ -13,7 +13,11 @@ import (
 // we have imported the package and will get the things from it which are exported only.
 
 // const apiURL = "https://cex.io/api/ticker/BTC/INR" // make the apiURL small case so to make it private to the package.
-const apiURL = "https://cex.io/api/ticker/%s" // make the apiURL small case so to make it private to the package.
+const apiURL =  "https://open.er-api.com/v6/latest/%s"
+// I am using the api URL because the api in the lecture is deprecated.
+// This api URL provides the exchange rate to all the currencies which are available on the platform from the currency we pass. 
+
+// const apiURL = "https://cex.io/api/ticker/%s" // make the apiURL small case so to make it private to the package.
 // now, we need to pass the two - 3 letter ISO code of the currency to get the current price of the crypto in that currency. eg. INR for indian rupee and BTC for bitcoin
 // to make this dynamic we will put the %s in the apiURL where we have the currency to put on the runtime.
 
@@ -45,7 +49,6 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 		if err != nil {
 			return nil, err // wifi, or offline between the transfer error.
 		}
-
 		// As a JSON string just by calling the string converter.It receives the bytes and it will convert that into a string using UTF eight.
 		json := string(bodyBytes)
 		fmt.Println(json)
@@ -55,6 +58,6 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 		return nil, fmt.Errorf("Status Code recieved : %v", res.StatusCode)
 	}
 
-	rate := datatypes.Rate{Currency: currency, Price: 20} // for now we are taking the temporaray value of 20 for the price.
+	rate := datatypes.Rate{Currency: currencyUpper, Price: 20} // for now we are taking the temporaray value of 20 for the price.
 	return &rate, nil                                     // we have to return the pointer of type Rate so use the &.
 }

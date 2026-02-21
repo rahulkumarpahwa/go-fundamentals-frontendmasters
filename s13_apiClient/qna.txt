@@ -57,3 +57,20 @@ Because HTTP responses are received in chunks over TCP, allowing for streaming a
 
 How do you create a pointer to a struct instance in Go?
 Using the & operator before the struct variable
+
+--lec36--
+What happens when using the dot operator with a pointer to a struct in Go?
+The dot operator automatically dereferences the pointer and allows direct access to struct methods and properties, making it easier to work with struct pointers without explicitly dereferencing them.
+
+
+Why did the application trigger repeated firewall alerts when using go run?
+Each time go run is executed, it builds a new binary in a temporary directory, which is considered a new application from the operating system's perspective, causing repeated firewall alerts.
+
+What is the type of the rate variable when calling an API method?
+The rate variable is a pointer to the struct, not the struct itself, but the dot syntax allows direct access to its properties and methods.
+
+What initial step is needed after receiving JSON from a server?
+Parse the JSON, as it is currently just a string and needs to be converted into a usable data structure.
+
+What issue occurs when initially printing the rate?
+The rate is initially printed as a memory address (pointer) instead of its actual value, requiring further processing to display the desired information.
