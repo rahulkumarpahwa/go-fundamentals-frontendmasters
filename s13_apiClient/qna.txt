@@ -16,3 +16,25 @@ The file must have 'package main' declaration and contain a function named 'main
 How do you create a new Go module in a project?
 Use the command 'go mod init' followed by a URL-based project name, which creates a go.mod file in the project root
 
+---lec34---
+
+What are the main HTTP verbs available in Go's standard library?
+Get, Post, Put, and Delete are the main HTTP verbs available as functions in the net/http package
+
+In Go, are HTTP methods like Get and Post actual methods?
+No, they are functions in the http package, not methods. They look like methods but are actually exported functions
+
+What does the strings.ToUpper() function do in Go?
+It takes a string as input and returns a new string with all characters converted to uppercase, without modifying the original string
+
+What is important to know about the len() function when used with strings in Go?
+The len() function returns the number of bytes in a string, not the number of characters. This can be misleading with Unicode characters like emojis which may use multiple bytes
+
+How can you create a dynamic URL in Go using string formatting?
+Use fmt.Sprintf() with a URL template and pass variables as arguments to create a dynamic URL string
+
+What does the len() function return when used on a string in Go?
+Number of bytes in the string
+
+In Go's http package, how can you make a generic HTTP request?
+Using the Request function where you specify the verb as an argument
