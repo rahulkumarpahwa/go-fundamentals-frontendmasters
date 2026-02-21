@@ -1,0 +1,18 @@
+---lec33--
+What is the significance of the first letter's capitalization when defining struct fields in Go?
+Capitalized first letters make struct fields exported and accessible from outside the package, while lowercase first letters keep fields private to the package
+
+What are two common float types used for representing currency prices in Go?
+float32 and float64, with float64 being more commonly used due to higher precision and default JSON encoding behavior
+
+When importing packages in Go, what is imported at the package level?
+The entire package is imported, not individual elements or names. All exported elements from the imported package become available
+
+
+What are the key requirements for a Go file to be considered a valid executable program?
+The file must have 'package main' declaration and contain a function named 'main'
+
+
+How do you create a new Go module in a project?
+Use the command 'go mod init' followed by a URL-based project name, which creates a go.mod file in the project root
+
