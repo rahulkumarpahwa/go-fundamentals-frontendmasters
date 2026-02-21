@@ -38,3 +38,22 @@ Number of bytes in the string
 
 In Go's http package, how can you make a generic HTTP request?
 Using the Request function where you specify the verb as an argument
+
+--lec35--
+What is the recommended way to return a nil rate in Go?
+Use a pointer to the rate, which can be set to nil. This is typically done by using the star (*) symbol when defining the return type and using the ampersand (&) to get a pointer to an instance.
+
+What HTTP status code indicates a successful response?
+200 is the status code that indicates everything is okay in an HTTP response.
+
+How can you read the entire body of an HTTP response in Go?
+Use the io.ReadAll() function, which reads a stream synchronously and returns a slice of bytes or an error.
+
+What is the recommended way to create a custom error message in Go?
+Use fmt.Errorf() from the format package to create a new error with a formatted string, which allows you to include dynamic values in the error message.
+
+Why is an HTTP response body represented as an io.ReadCloser?
+Because HTTP responses are received in chunks over TCP, allowing for streaming and progressive downloading of data, rather than receiving the entire response at once.
+
+How do you create a pointer to a struct instance in Go?
+Using the & operator before the struct variable
