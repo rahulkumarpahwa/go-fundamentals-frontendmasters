@@ -1,0 +1,78 @@
+Statement : And that every goroutine is actually in the same share space, because it's like,initially we think that every goroutine we have its own set of variable, andthat's not true.
+
+Conclusion:
+
+Yes — that statement is correct.
+
+In Go:
+
+Goroutines do NOT have their own separate variable space.
+
+They all run inside the same shared memory space of the process.
+
+This means:
+
+If two goroutines access the same variable,
+
+They are accessing the same memory location, not copies.
+
+What is separate then?
+
+Each goroutine has:
+
+Its own stack
+
+Its own execution flow
+
+But they all share:
+
+The heap
+
+Global variables
+
+Shared data structures
+
+Memory of the same process
+
+Why this matters
+
+Because if multiple goroutines modify the same variable at the same time, you can get:
+
+Race conditions
+
+Unexpected results
+
+Data corruption
+
+Example conceptually:
+
+var counter int
+
+go func() {
+    counter++
+}()
+
+go func() {
+    counter++
+}()
+
+Both goroutines access the same counter.
+Without synchronization (like sync.Mutex or sync.WaitGroup), this can cause incorrect results.
+
+Important Conclusion
+
+Goroutines are lightweight threads inside the same process.
+They share memory.
+They are NOT isolated environments.
+
+That’s why Go provides:
+
+sync.Mutex
+
+sync.WaitGroup
+
+Channels
+
+Atomic operations
+
+To control shared access safely.

@@ -1,0 +1,18 @@
+What is a lambda function in Go?
+A function created on the fly without a name, which can be executed immediately or used as a closure.
+
+// this problem is till the vesion 1.22 and solved after that : (below question)
+What problem occurs when creating goroutines inside a loop when accessing loop variables?
+All goroutines will reference the last value of the loop variable, as they share the same memory space and access the variable by reference, not by value.
+
+How can you resolve the goroutine loop variable reference issue?
+By passing the loop variable as a parameter to the goroutine function, which creates a copy of the value and prevents all goroutines from referencing the same variable.
+
+
+What is a closure in Go?
+A function that can access and reference local variables from the outer function in which it is defined, keeping those variables alive even after the outer function has completed execution.
+
+How do function parameters work in Go with regards to variable copying?
+When a function is called, the arguments passed to it are automatically copied, creating a new instance of the variable.
+
+
