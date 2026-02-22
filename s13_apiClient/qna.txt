@@ -92,3 +92,22 @@ What is a common challenge when parsing JSON from an external API into a local d
 The JSON structure might not directly match the local data model, requiring conversion or creating a separate data type to represent the API response.
 
 
+--lec38---
+What tool can help convert JSON to Go struct?
+By using online tools like 'json to go struct', you can paste JSON and automatically generate corresponding Go struct definitions with appropriate types and mappings
+
+What is the purpose of backticks when defining struct metadata in Go?
+Backticks allow specifying metadata instructions for libraries like JSON marshaling/unmarshaling, enabling property name mapping and handling special characters without quote conflicts
+
+How can you handle property name differences between JSON and Go struct?
+Use JSON struct tags with backticks to map JSON property names to Go struct field names, allowing different naming conventions while maintaining correct data mapping
+
+What is the significance of reflection APIs in Go struct metadata?
+Reflection APIs allow libraries to read and interpret struct metadata at runtime, enabling dynamic type inspection and automatic mapping between JSON and struct properties
+
+When unmarshaling JSON in Go, what is recommended regarding struct definition?
+Create a separate response struct that matches the JSON structure, rather than unmarshaling JSON directly into an existing struct, to ensure proper type mapping and flexibility
+
+What is the purpose of using backticks (`) when defining JSON metadata in a Go struct?
+To allow double quotes inside the metadata string
+

@@ -40,6 +40,7 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 		// so, to return the 'nil' we will return the pointer to the Rate and then we can return nil.
 		return nil, err // netwwork error, domain error, server down error, URL wrong, etc.
 	}
+	var apiResponse APIResponse
 	if res.StatusCode == http.StatusOK {
 		// here the data comes, it does not come in one go. It come in chunks. The TCP stack is giving you the response in chunks as soon as they are available from the network.
 		// so, one way is to handle it line by line manually till the end of the file when we get the signal that it does not have more or the other way is use the 'io' which has the method ReadAll. ReadAll will receive a reader with a stream and it will read everything until the end, synchronously in one execution.
@@ -56,8 +57,15 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 		// fmt.Println(data)
 		// now, instead of printing it, we will parse the json we got.
 
-		var currenyRate datatypes.Rate // here data will be stored by the Unmarshal after we get the from bytes from the ReadAll which has the response body.
-		err = json.Unmarshal(bodyBytes, &currenyRate)
+		// var currenyRate datatypes.Rate // here data will be stored by the Unmarshal after we get the from bytes from the ReadAll which has the response body.
+
+		// so, we will create the variable of the ApiResponse struct and pass it in the Unmarhsal method to get the json data in it.
+
+		// so, we will not directly pass the response from the api into our main output structure which is 'Rate' but we will create another structure which will handle the response from the json parse and later we will use this to convert to our main value.
+
+		// err = json.Unmarshal(bodyBytes, &currencyRate)
+		err = json.Unmarshal(bodyBytes, &apiResponse)
+		fmt.Println(apiResponse)
 		// Unmarshal parses the JSON-encoded data and stores the result in the value pointed to by v. If v is nil or not a pointer, Unmarshal returns an InvalidUnmarshalError.
 		// also, here we pass the &currencyRate, so as the function Unmarshal will not use the copy to change but in the actual value itself.
 		if err != nil {
@@ -71,6 +79,6 @@ func GetRate(currency string) (*datatypes.Rate, error) {
 		return nil, fmt.Errorf("Status Code recieved : %v", res.StatusCode)
 	}
 
-	rate := datatypes.Rate{Currency: currencyUpper, Price: 20} // for now we are taking the temporaray value of 20 for the price.
-	return &rate, nil                                          // we have to return the pointer of type Rate so use the &.
+	rate := datatypes.Rate{Currency: currencyUpper, Price: apiResponse.Rates["USD"], List: apiResponse.Rates} // for now we are taking the temporaray value of 20 for the price.
+	return &rate, nil                                                                                         // we have to return the pointer of type Rate so use the &.
 }
