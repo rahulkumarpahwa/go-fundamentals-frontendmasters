@@ -1,0 +1,19 @@
+What is the difference between synchronous and asynchronous operations in Go?
+Synchronous operations block the thread until the operation is complete, while Go typically uses Goroutines for asynchronous operations to avoid blocking the thread. In synchronous operations, each task waits for the previous one to finish before starting.
+
+How do you create and execute Goroutines in Go?
+To create a Goroutine, you prefix a function call with the 'go' keyword, which allows the function to run concurrently. For example: go getCurrencyData(currency). Each Goroutine runs in its own thread and does not block the main thread's execution.
+
+What is a sync.WaitGroup in Go, and how is it used?
+A sync.WaitGroup is a counter that helps synchronize multiple Goroutines. It uses methods like Add() to increment the counter when starting a Goroutine, and Done() to decrement the counter when a Goroutine completes. The Wait() method blocks until the counter reaches zero, ensuring all Goroutines have finished.
+
+Why do Goroutines need explicit synchronization mechanisms?
+Goroutines need explicit synchronization because the main function can complete and end the entire process before background Goroutines finish. Without synchronization mechanisms like sync.WaitGroup or time.Sleep(), background Goroutines may not complete their work before the program exits.
+
+How can you iterate over a slice of values and create Goroutines in Go?
+You can use a range-based for loop to iterate over a slice and create Goroutines. For example: for _, currency := range currencies { go getCurrencyData(currency) }. This allows you to dynamically create Goroutines for each item in the slice.
+
+
+In Go, how are HTTP GET requests typically handled?
+As synchronous operations
+
