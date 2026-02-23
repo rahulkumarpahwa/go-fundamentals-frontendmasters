@@ -1,0 +1,28 @@
+How do you enable debugging in Go when using VS Code?
+Set a breakpoint in the code, go to the debug menu, and click 'Run and Debug'. Make sure you are in the main.go file, and create a launch.json file if needed to specify starting from the main entry point.
+
+What is a ServMux in Go?
+A ServMux is a multiplexer object created using NewServMux() that allows you to add handlers to a specific server instead of using global HTTP handlers ie. http.HandleFunc() we create the server.HandleFunc(). It provides a way to organize and manage route handlers more effectively.
+
+Why do you need to restart a Go server after making code changes?
+Go compiles the code and keeps it in memory, so changes won't be reflected until the server is stopped and restarted. This means you need to use CTRL+C to stop the server and run it again to see code modifications.
+
+In Go, how can you pass a function as an argument?
+In Go, you can pass a function as an argument by referencing the function name without parentheses. For example, when setting up an HTTP handler, you can pass HandleAuth directly as an argument without executing it.
+
+What determines whether a folder is a Go package?
+A folder becomes a Go package only if it contains Go files. Folders without .go files are not considered packages, and the compiler will ignore them completely.
+
+What method is used to create a new ServMux in Go?
+NewServMux()
+
+In Go, how can you pass a function as an argument?
+Pass the function name without parentheses
+
+
+
+In VS Code, what configuration file helps specify the entry point for debugging?
+launch.json
+
+
+
