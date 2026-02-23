@@ -1,0 +1,15 @@
+What Go package is used for creating web servers?
+The HTTP package
+
+
+What function from the HTTP package is used to start a web server?
+ListenAndServe
+
+What are the two arguments required by ListenAndServe?
+The first argument is the address/port, and the second argument is a handler (which can be nil)
+
+What method is used to write a response in a web handler function?
+Use the ResponseWriter's Write method, which requires a slice of bytes (can be converted from a string using []byte())
+
+What happens by default if no handler is defined for a requested URL?
+The server returns a 404 Not Found error
