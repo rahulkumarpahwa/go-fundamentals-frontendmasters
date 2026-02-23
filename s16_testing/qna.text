@@ -1,0 +1,16 @@
+What is the standard naming convention for test files in Go?
+Test files in Go have the suffix '_test', such as 'example_test.go'
+
+
+
+How do you define a test function in Go?
+Test functions start with 'Test' (capital T), have a special signature that receives a pointer to testing.T, and are located in a file with the '_test' suffix
+
+How do you run tests in Go?
+Use the CLI command 'go test', which will automatically find and run all test files in the current package
+
+What is the Table Driven Test design pattern in Go?
+A pattern where tests are created using a table of different input arguments and expected results, allowing efficient testing of multiple scenarios in a single test function
+
+How do you indicate a test failure in Go?
+Use methods like t.Error() or t.Errorf() on the testing.T argument to mark a test as failed and optionally provide an error message
