@@ -13,7 +13,9 @@ func main() {
 
 	// File Server:
 	fs := http.FileServer(http.Dir("./public"))
-	// this will serve all the files in public folder.
+	// this will serve all the files in public folder. pass here the relative path.
+
+	server.Handle("/", fs) // see below the chatgpt explanation.
 
 	err := http.ListenAndServe(":1999", server)
 	if err != nil {
@@ -135,3 +137,29 @@ server.Handle("/", fs)
 
 Because fs is a type, not a function.
 */
+
+// So, okay, and in this case, we're using that version where we will have the fs as type which has already the method to handle thr route so we will use the Handle instead of HandleFunc to pass the fs in it, otherwise in the normal cases where we create the method we will pass the function to handle that route.
+
+// now, we can open the chrome and go to localhost:1999/ then our static files will be served.  (note : make sure to have the route "/" only in the Handle() method. any new path will lead to addition of that in finding the files from that folder as well relative the Dir passed in the Dir() method)
+
+//Is this server-side rendering?No, this is statically serving a folder.
+
+//By the way, can we call more than one time handler, HandlerFunc? 
+// Yes, as many as you want.And actually, the system will look to the pattern (route path pattern) and we'll pick the first one that matches like most of the routing systems.
+
+// Now, if you look at the page source in the HTML in public folder, you only have one article (an H2, a paragraph and an image) in the HTML.
+// The rest of the articles are actually coming from JavaScript.
+// So it's a client-side render solution.
+
+// JavaScript is downloading a JSON, andit's parsing the JSON and is injecting HTML on the fly.
+
+// But that's not so performant, because we need the user has to wait for JavaScript to load to then go and grab a JSON And then when we have the JSON, it needs to generate that HTML dynamically.
+
+// Important : 
+// But now, we are setting that this is bad for performance, sowe can do server-side rendering.
+// That is, maybe we can actually inject in the HTML all the articles directly from an aesthetic collection that you have somewhere.
+
+// It can be a database, a JSON, whatever.Makes sense?So I want to create all these articles server-side,so the browser will receive just HTML.
+// We can even get rid of JavaScript at all.
+// So we can get rid of the script.js and see the same thing on the screen.
+// next lecture.

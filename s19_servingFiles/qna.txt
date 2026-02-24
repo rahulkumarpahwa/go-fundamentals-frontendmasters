@@ -1,0 +1,20 @@
+What Go package utility allows you to create a file server that automatically serves files from a file system?
+http.FileServer from the HTTP package
+
+What are two ways to handle routes in Go when using handlers?
+1. Parse a function,
+2. Parse a Type that conforms to an interface with a method that is ultimately a function
+
+What is the problem with client-side rendering for loading articles?
+It is not performant because the user must wait for JavaScript to load, then download JSON, and then dynamically generate HTML
+
+What is server-side rendering, as described?
+Injecting articles directly into HTML from a static collection (like a database or JSON) so the browser receives complete HTML without needing JavaScript
+
+What precaution should be taken when creating a file server with http.FileServer?
+Be careful to specify a specific folder to prevent users from accessing the entire file system
+
+
+
+What are two ways to handle routes in Go?
+HandleFunc and Handle
