@@ -1,0 +1,365 @@
+================================================================================
+SECTION 02: FUNCTIONS, CONTROL STRUCTURES & ERROR HANDLING
+================================================================================
+
+TOPIC 1: FUNCTION FUNDAMENTALS
+==============================
+
+Functions in Go follow this syntax:
+    func functionName(parameters) returnTypes {
+        // function body
+    }
+
+BASIC FUNCTION STRUCTURE:
+
+No Parameters, No Return:
+    func save() {
+        // does something
+    }
+
+With Parameters:
+    func save2(text string) {
+        fmt.Println("saving", text)
+    }
+
+With Return Value:
+    func add(a int, b int) int {
+        return a + b
+    }
+
+Key Points:
+- Parameter types are specified after the parameter name
+- Return type is specified after parameter list
+- Parameters are pass-by-value by default
+
+TOPIC 2: MULTIPLE RETURN VALUES
+===============================
+
+Go allows functions to return multiple values simultaneously. This is useful
+for returning both a value and an error status.
+
+Syntax: func name(params) (type1, type2, type3) {
+            return value1, value2, value3
+        }
+
+Examples from functions.go:
+
+    func addAndSubtract(a int, b int) (int, int) {
+        return a + b, a - b
+    }
+
+    func calculateTax(price float32) (float32, float32, string) {
+        return price * 0.2, price * 0.3, "hello"
+    }
+
+Usage:
+    cityTax, stateTax, _ := calculateTax(100)
+    fmt.Println(cityTax, stateTax)  // Output: 20 30
+
+The underscore (_) is the blank identifier - it discards the value (the "hello" string).
+
+This pattern is used throughout Go for error handling.
+
+TOPIC 3: POINTERS - PASS BY VALUE vs PASS BY REFERENCE
+======================================================
+
+Go is pass-by-value by default. To modify the original variable, use POINTERS.
+
+POINTER SYNTAX:
+- & = address-of operator (get the address of a variable)
+- * = dereference operator (access the value at an address)
+
+Example Usage - Pass by Value (Does NOT modify original):
+
+    func nextBirthday(birthday int) {
+        birthday = birthday + 1  // Only modifies the copy
+    }
+    
+    age := 34
+    nextBirthday(age)
+    fmt.Println(age)  // Still 34! Original unchanged
+
+Example Usage - Pass by Reference (Modifies original):
+
+    func nextBirthdayPointer(birthday *int) {
+        *birthday = *birthday + 1  // Modifies the original variable
+    }
+    
+    age := 34
+    nextBirthdayPointer(&age)  // Pass the ADDRESS using &
+    fmt.Println(age)           // Now 35! Original modified
+
+BREAKING IT DOWN:
+- age := 34              // Create variable with value 34
+- &age                   // Get the address of age (memory location)
+- birthday *int          // birthday is a pointer to an int
+- *birthday              // Dereference: access the value at that address
+- *birthday = value      // Assign a new value through the pointer
+
+Practical Example:
+    age := 34
+    age2 := 34
+    
+    nextBirthday(age)           // Pass value
+    nextBirthdayPointer(&age2)  // Pass address
+    
+    fmt.Println(age)   // 34 (unchanged)
+    fmt.Println(age2)  // 35 (changed)
+
+TOPIC 4: POINTERS TO POINTERS (Double Pointers)
+===============================================
+
+Go even supports pointers to pointers:
+
+    func nextBirthdayPointerPointer(birthday **int) {
+        **birthday = **birthday + 1
+    }
+
+Usage:
+    age3 := 34
+    age3pointer := &age3              // age3pointer points to age3
+    nextBirthdayPointerPointer(&age3pointer)  // Pass address of pointer
+    fmt.Println(age3)  // 35
+
+Breaking it down:
+- age3pointer := &age3       // Pointer to int (address of age3)
+- &age3pointer               // Address of the pointer (pointer to pointer)
+- **birthday                 // Dereference twice: address -> pointer -> value
+
+This is rarely needed but exists if required.
+
+TOPIC 5: DEFER KEYWORD
+=====================
+
+The defer keyword delays execution of a statement until the function returns.
+Multiple defers create a STACK (LIFO - Last In First Out).
+
+Example from main():
+    defer fmt.Println("this is line printed using the defer keyword. this will be printed at last after the last one defer, as this forms the stack.")
+    defer fmt.Println("this is line printed using the defer keyword. this will be printed at last.")
+
+Output Order:
+    [Normal code executes first]
+    [When function ends, defers execute in reverse order]
+    "this is line printed using the defer keyword. this will be printed at last."
+    "this is line printed using the defer keyword. this will be printed at last after the last one defer..."
+
+Execution Order:
+1. First defer (bottom) executes LAST
+2. Second defer (top) executes FIRST
+3. Forms a stack structure
+
+Use Cases:
+- Closing files: defer file.Close()
+- Releasing locks: defer mutex.Unlock()
+- Cleanup operations
+- Resource management
+
+TOPIC 6: PANIC BUILT-IN FUNCTION
+================================
+
+The panic() function stops normal execution and starts panicking.
+
+    func printIntValue(num int) {
+        if num > 10 {
+            panic("this is the panic.")
+        }
+    }
+
+When panic is called:
+- Execution stops immediately
+- Deferred functions still execute
+- Error message is printed
+- Program terminates
+
+Example:
+    panic("this is the panic.")
+    // Remaining code in function doesn't execute
+    // But defer statements still run before termination
+
+Note: Panic is for exceptional situations, not normal error handling.
+
+TOPIC 7: BLANK IDENTIFIER (_)
+=============================
+
+The underscore (_) discards a value and is useful for ignoring return values.
+
+Example:
+    cityTax, stateTax, _ := calculateTax(100)
+    // The third return value (string "hello") is discarded
+
+Common Uses:
+- Ignoring error values temporarily
+- Ignoring unused return values
+- Keeping code clean
+
+TOPIC 8: IF-ELSE STATEMENTS
+===========================
+
+Basic If-Else:
+    if condition {
+        // code
+    } else {
+        // code
+    }
+
+Variable Declaration in If Statement:
+    if message := "hello msg from control"; user != nil {
+        fmt.Println(message)  // message is only accessible here
+    } else {
+        // code
+    }
+    // message is NOT accessible here - scope limited to if-else block
+
+This scoped variable approach keeps variable lifetime minimal.
+
+Checking for Nil:
+    user := make([]int, 0)  // Empty slice
+    if user != nil {
+        fmt.Println(user)    // Executes - slice exists even if empty
+    }
+
+TOPIC 9: SWITCH-CASE STATEMENTS
+===============================
+
+Basic Switch:
+    day := "Monday"
+    switch day {
+    case "Monday":
+        fmt.Println("It's Monday!")
+    case "Tuesday":
+        fmt.Println("It's Tuesday")
+    default:
+        fmt.Print("Enter the correct day!")
+    }
+
+The FALLTHROUGH keyword:
+    switch day {
+    case "Monday":
+        fmt.Println("It's Monday!")
+        fallthrough  // Don't break - continue to next case!
+    case "Tuesday":
+        fmt.Println("It's Tuesday")
+    }
+
+With "Monday":
+    Output:
+    It's Monday!
+    It's Tuesday
+
+Without fallthrough, it would only print "It's Monday!"
+
+Switch with Boolean Conditions (Multiple Conditions):
+    // switch { 
+    // case user == nil:
+    //   fmt.Println("User is nil")
+    // case user.active == false:
+    //   fmt.Println("User is not active")
+    // }
+
+When switch has no expression, cases evaluate boolean conditions.
+
+TOPIC 10: FOR LOOPS
+==================
+
+Go has different types of loops:
+
+CLASSIC FOR LOOP (C-style):
+    for i := 0; i < 10; i++ {
+        // i starts at 0, increments by 1, until 10
+    }
+
+FOR-RANGE (Iterate over collection):
+    for index := range collection {
+        // index goes from 0 to len(collection)-1
+    }
+
+FOR-RANGE WITH KEY-VALUE (Maps/Slices):
+    for key, value := range mapVariable {
+        // Both key and value available
+    }
+
+FOR AS WHILE LOOP:
+    for condition {
+        // Executes while condition is true
+    }
+    
+    endOfGame := false
+    for endOfGame {
+        // process Game Loop
+    }
+
+INFINITE LOOP:
+    for {
+        // Never ends unless break is called
+    }
+
+Loops with Break/Continue:
+    for i := 0; i < 10; i++ {
+        if i == 5 {
+            break  // Exit loop
+        }
+        if i == 2 {
+            continue  // Skip to next iteration
+        }
+    }
+
+TOPIC 11: ERROR HANDLING PATTERN
+================================
+
+Go uses a unique pattern for error handling - returning the value AND an error:
+
+Example:
+    func readUser(id int) (user any, err any) {
+        ok := true
+        if ok {
+            return user, nil  // Success: return user and nil error
+        } else {
+            return nil, err   // Failure: return nil user and error
+        }
+    }
+
+Common Pattern:
+    user, err := readUser(89)
+    if err != nil {
+        // Handle error
+        return
+    }
+    // Use user safely
+
+This pattern is used throughout Go instead of try-catch exceptions.
+
+TOPIC 12: FORMATTING STRINGS
+============================
+
+The Printf function allows formatted output:
+
+    fmt.Printf("The age without the reference usage is %v and with reference is %v\n", age, age2)
+
+Format Specifiers:
+- %v = any value (default format)
+- %d = decimal integer
+- %s = string
+- %f = floating point
+- %t = boolean
+
+Note: Printf does NOT add newline automatically (unlike Println).
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Functions can return multiple values: func f() (int, string) { ... }
+2. Go is pass-by-value; use pointers (*) to modify original variables
+3. & gets the address, * dereferences to get the value
+4. defer executes when function ends, in LIFO order (forming a stack)
+5. panic stops execution but still runs deferred functions
+6. Use _ to discard unwanted return values
+7. if statements can declare scoped variables: if x := getValue(); x != nil { ... }
+8. switch statements test multiple cases; use fallthrough to skip break
+9. for loops support classic C-style, range, while-style, and infinite variations
+10. Errors are returned as additional return values, not thrown as exceptions
+11. Check errors explicitly: if err != nil { ... }
+12. Multiple defers execute in reverse order (stack behavior)
+
+================================================================================

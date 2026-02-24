@@ -1,0 +1,394 @@
+================================================================================
+SECTION 14: WAITGROUPS & ASYNCHRONOUS API CALLS
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section combines goroutines with the sync.WaitGroup to make multiple
+asynchronous API calls efficiently. Key concepts include:
+- sync.WaitGroup for goroutine synchronization
+- Asynchronous vs synchronous operations
+- Multiple concurrent HTTP requests
+- Proper goroutine completion handling
+- Avoiding deadlocks with explicit synchronization
+
+WaitGroup replaces the need for hardcoded sleep durations or infinite loops.
+
+TOPIC 1: THE PROBLEM - BLOCKING MAIN
+===================================
+
+Goroutines don't block the main function:
+
+Sequential (Blocking):
+    func main() {
+        GetCurrencyData("inr")   // Wait ~1 second
+        GetCurrencyData("usd")   // Wait ~1 second
+        // Total: ~2 seconds
+    }
+
+Asynchronous (Non-blocking):
+    func main() {
+        go GetCurrencyData("inr")
+        go GetCurrencyData("usd")
+        // Main continues immediately (problem!)
+        // Program ends before goroutines finish
+    }
+
+From main.go Comment:
+    "now if we run directly then nothing will print as the main shutdown
+     before any other goroutine will get completed."
+
+Without Waiting:
+- Goroutines start
+- Main function finishes
+- Program terminates
+- Goroutines killed before they complete
+
+Solution: Use sync.WaitGroup to wait for goroutines!
+
+TOPIC 2: SYNC.WAITGROUP BASICS
+=============================
+
+WaitGroup is a counter for synchronizing goroutines.
+
+Declaration:
+    import "sync"
+    
+    var wg sync.WaitGroup
+
+Key Methods:
+1. wg.Add(n) - Increment counter by n
+2. wg.Done() - Decrement counter by 1
+3. wg.Wait() - Block until counter reaches 0
+
+Workflow:
+    Before goroutine: wg.Add(1)      // Counter: 1
+    During execution: [goroutine runs]
+    Before return:    wg.Done()      // Counter: 0
+    In main:          wg.Wait()      // Blocks until 0
+
+From main.go:
+    var wg sync.WaitGroup
+    
+    for _, currency := range currencies {
+        wg.Add(1)
+        go GetCurrencyData(currency, &wg)
+    }
+    
+    wg.Wait()  // Blocks here until all goroutines call Done()
+
+TOPIC 3: WAITGROUP PATTERN
+==========================
+
+Step-by-step pattern for concurrent operations:
+
+1. Create WaitGroup:
+    var wg sync.WaitGroup
+
+2. For Each Goroutine:
+    wg.Add(1)           // Increment counter
+    go someFunction(&wg) // Pass as pointer
+
+3. Inside Goroutine:
+    func someFunction(wg *sync.WaitGroup) {
+        defer wg.Done()  // Decrement when done
+        // Do work
+    }
+
+4. In Main:
+    wg.Wait()  // Block until counter is 0
+
+From main.go:
+    var wg sync.WaitGroup
+    
+    for _, currency := range currencies {
+        wg.Add(1)
+        go GetCurrencyData(currency, &wg)
+    }
+    
+    wg.Wait()
+
+TOPIC 4: WHY PASS WAITGROUP AS POINTER
+=====================================
+
+WaitGroup must be passed as a pointer to be modified.
+
+If Passed by Value:
+    go GetCurrencyData(currency, wg)  // WRONG
+    // wg.Done() would decrement a copy
+    // Original wg.Wait() doesn't see the Done()
+    // Deadlock!
+
+If Passed by Pointer:
+    go GetCurrencyData(currency, &wg)  // CORRECT
+    // wg.Done() decrements the original
+    // wg.Wait() sees the Done() calls
+    // Works correctly!
+
+From main.go:
+    wg.Add(1)
+    go GetCurrencyData(currency, &wg)  // Pass pointer with &
+
+From main function:
+    func GetCurrencyData(currency string, wg *sync.WaitGroup) {
+        defer wg.Done()  // Access through pointer
+    }
+
+TOPIC 5: DEFER WAITGROUP.DONE()
+==============================
+
+Using defer ensures Done() is always called:
+
+Without defer:
+    func GetCurrencyData(currency string, wg *sync.WaitGroup) {
+        data, err := api.GetPrice(currency)
+        if err != nil {
+            return  // Done() never called if error!
+        }
+        fmt.Println(data)
+        wg.Done()
+    }
+
+With defer (Safe):
+    func GetCurrencyData(currency string, wg *sync.WaitGroup) {
+        defer wg.Done()  // Always called, even on return
+        
+        data, err := api.GetPrice(currency)
+        if err != nil {
+            return  // Done() still called!
+        }
+        fmt.Println(data)
+    }
+
+From main.go:
+    func GetCurrencyData(currency string, wg *sync.WaitGroup) {
+        fmt.Println("O")
+        data, err := api.GetPrice(currency)
+        // ... handle error ...
+        fmt.Println(data.Price, data.Currency)
+        wg.Done()
+    }
+
+Best Practice: Always use defer
+
+TOPIC 6: SYNCHRONOUS VS ASYNCHRONOUS
+===================================
+
+Understanding the execution model:
+
+Synchronous (Blocking):
+    http.Get(url)  // Thread waits for response
+                   // Response received
+                   // Continue to next line
+
+From main.go Comment:
+    "So you're used to async operations using solutions such as promises
+     Well, you don't have that here. So here this is a synchronous operation.
+     When you call get, there is a thread waiting for the network to finish,
+     and then it's giving you back the execution. So it is sync, not async."
+
+Asynchronous (Non-blocking) in Go:
+    go func() {
+        http.Get(url)  // Runs in goroutine
+    }()
+    // Main continues immediately
+
+Go's Approach:
+- Individual operations are synchronous (http.Get waits)
+- Concurrency through goroutines (multiple threads)
+- No promises/async/await keywords
+- Use goroutines + WaitGroup for async behavior
+
+TOPIC 7: MULTIPLE CONCURRENT API CALLS
+========================================
+
+Making multiple API calls simultaneously:
+
+Sequential (Slow):
+    data1 := api.GetPrice("inr")   // ~1 second
+    data2 := api.GetPrice("usd")   // ~1 second
+    data3 := api.GetPrice("eur")   // ~1 second
+    // Total: ~3 seconds
+
+Concurrent with WaitGroup (Fast):
+    var wg sync.WaitGroup
+    
+    for _, currency := range []string{"inr", "usd", "eur"} {
+        wg.Add(1)
+        go GetCurrencyData(currency, &wg)
+    }
+    
+    wg.Wait()  // All three run simultaneously
+    // Total: ~1 second!
+
+From main.go:
+    currencies := []string{"inr", "usd", "eur", "gbp"}
+    for _, currency := range currencies {
+        wg.Add(1)
+        go GetCurrencyData(currency, &wg)
+    }
+    wg.Wait()
+
+Performance Benefit:
+- Sequential: Sum of all operation times
+- Concurrent: Maximum of all operation times
+- 4 API calls: ~4 seconds → ~1 second
+
+TOPIC 8: EXECUTION ORDER WITH GOROUTINES
+==========================================
+
+Goroutine execution order is unpredictable:
+
+From main.go:
+    go GetCurrencyData("inr", &wg)
+    fmt.Println("T")  // Printed first, before goroutine starts
+
+Output Order:
+    T    // Main prints immediately (synchronous)
+    O    // Goroutine prints when it gets CPU time
+
+Comment from code:
+    "fmt.Println("T") // printed first
+     fmt.Println("O") // printed after T"
+
+Next Steps Are Non-Deterministic:
+    wg.Add(1)
+    go GetCurrencyData(currency, &wg)
+    fmt.Println("T")
+
+Result (varies each run):
+    T (main continues)
+    O (goroutine starts)
+    O (next currency)
+    T
+    etc.
+
+Why?
+- Goroutines scheduled by OS/runtime
+- No guaranteed order
+- Depends on CPU load and scheduling
+- Different every time program runs
+
+TOPIC 9: COMMON WAITGROUP MISTAKES
+==================================
+
+Mistake 1: Forgetting Add()
+    go GetCurrencyData(currency, &wg)  // Missing wg.Add(1)
+    wg.Wait()  // Doesn't wait (counter never incremented)
+
+Mistake 2: Passing by Value
+    go GetCurrencyData(currency, wg)  // Wrong, not &wg
+    // Deadlock because copy's Done() ignored
+
+Mistake 3: Not Calling Done()
+    func GetCurrencyData(wg *sync.WaitGroup) {
+        // ... do work ...
+        // Missing wg.Done()
+    }
+    // Wait() blocks forever
+
+Mistake 4: Wrong Add/Done Counts
+    wg.Add(3)
+    // Only create 2 goroutines
+    wg.Wait()  // Deadlock forever
+
+Correct Pattern:
+    wg.Add(1)
+    go func(wg *sync.WaitGroup) {
+        defer wg.Done()
+        // work
+    }(&wg)
+
+TOPIC 10: ALTERNATIVE TO WAITGROUP
+==================================
+
+Before WaitGroup (Not Recommended):
+
+Using Sleep:
+    go GetCurrencyData("inr")
+    go GetCurrencyData("usd")
+    time.Sleep(2 * time.Second)  // Guess how long to wait
+
+Problems:
+- Must guess wait duration
+- If too short: incomplete results
+- If too long: wasting time
+- Not reliable
+
+From main.go Comment:
+    "to handle it we need add some blocking to the main. this blocking,
+     easiest way is to use the Sleep.
+     note : that the time depend upon the what type of api call is made"
+
+Using Channels:
+    results := make(chan Result)
+    go func() {
+        results <- GetCurrencyData("inr")
+    }()
+    // Will deadlock or require complex handling
+
+From main.go Comment:
+    "we can use the channels, here but the channels get into deadlock
+     and to not have deadlock we need to close them but we don't know
+     when to close. so, to solve these problems we will create the 'sync group'."
+
+TOPIC 11: REAL-WORLD USE CASES
+=============================
+
+When to Use WaitGroup:
+
+1. Web Scraping Multiple Pages:
+    wg.Add(len(urls))
+    for _, url := range urls {
+        go fetchPage(url, &wg)
+    }
+    wg.Wait()
+
+2. Processing Files in Parallel:
+    wg.Add(len(files))
+    for _, file := range files {
+        go processFile(file, &wg)
+    }
+    wg.Wait()
+
+3. Broadcasting to Multiple Servers:
+    wg.Add(len(servers))
+    for _, server := range servers {
+        go sendRequest(server, &wg)
+    }
+    wg.Wait()
+
+4. API Data Collection (from this section):
+    wg.Add(len(currencies))
+    for _, currency := range currencies {
+        go GetCurrencyData(currency, &wg)
+    }
+    wg.Wait()
+
+From main.go:
+    currencies := []string{"inr", "usd", "eur", "gbp"}
+    for _, currency := range currencies {
+        wg.Add(1)
+        go GetCurrencyData(currency, &wg)
+    }
+    wg.Wait()
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. sync.WaitGroup is a counter for synchronizing goroutines
+2. wg.Add(n) increments counter by n (usually 1 per goroutine)
+3. wg.Done() decrements counter by 1 (call when goroutine finishes)
+4. wg.Wait() blocks until counter reaches 0 (use in main)
+5. Must pass WaitGroup as pointer to goroutines: &wg
+6. Use defer wg.Done() to ensure it's always called
+7. Multiple goroutines run concurrently - much faster than sequential
+8. Order of goroutine execution is unpredictable
+9. Never mix Add() counts with Done() calls (deadlock!)
+10. Replace sleep-based waits with WaitGroup for reliability
+11. Channels can deadlock - WaitGroup is simpler for simple cases
+12. Individual operations (http.Get) are synchronous; use goroutines for async
+
+================================================================================

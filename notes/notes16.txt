@@ -1,0 +1,426 @@
+================================================================================
+SECTION 16: TESTING IN GO
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section introduces Go's testing framework, which is built into the
+standard library. Key concepts include:
+- Test file naming convention (_test.go)
+- Test function signature and structure
+- Test packages and external testing
+- Error reporting in tests
+- Running tests with go test command
+- Table-driven tests pattern
+
+Go has excellent built-in testing support without external dependencies.
+
+TOPIC 1: GO'S BUILT-IN TESTING FRAMEWORK
+=======================================
+
+Go includes testing in the standard library - no external dependencies needed.
+
+Import Testing:
+    import "testing"
+
+Key Points:
+- No external testing framework needed
+- Part of Go's philosophy of simplicity
+- Full-featured for most needs
+- Easy to run with go test command
+
+From main.go Comment:
+    "testing is default in go.
+     any file with suffix _test.go is a test file.
+     put in the same package."
+
+Standard Library:
+    package testing  // Part of Go standard library
+    
+All testing functions use the testing.T type.
+
+TOPIC 2: TEST FILE NAMING
+========================
+
+Test files must follow a specific naming convention.
+
+Naming Rule:
+    *_test.go
+
+Examples:
+    - api_test.go - Tests for api package
+    - handler_test.go - Tests for handler package
+    - utils_test.go - Tests for utils package
+    - main_test.go - Tests for main package
+
+From code:
+    api_test.go
+
+This file contains tests for the api package.
+
+Why This Convention?
+- Go automatically recognizes _test.go files
+- `go test` command finds all test files
+- Clear separation: code vs tests
+- No need for separate test directory
+
+Directory Structure:
+    project/
+        api.go          (production code)
+        api_test.go     (test code)
+        handler.go
+        handler_test.go
+
+TOPIC 3: TEST FUNCTION SIGNATURE
+===============================
+
+All test functions follow a specific signature.
+
+Signature:
+    func TestFunctionName(t *testing.T) {
+        // test code
+    }
+
+Requirements:
+1. Must start with "Test" (capital T)
+2. Takes exactly one parameter: *testing.T
+3. Takes no return values
+4. Naming: TestFeatureName or TestMethodName
+
+From api_test.go:
+    func TestAPICALL(t *testing.T) {
+        _, err := api.GetPrice("")
+        if err == nil {
+            t.Error("Error was not found!")
+        }
+    }
+
+Breaking It Down:
+- func TestAPICALL - Starts with 'Test'
+- (t *testing.T) - Receives testing.T pointer
+- No return value
+- Inside: actual test logic
+
+TOPIC 4: TESTING.T - THE TEST OBJECT
+===================================
+
+The *testing.T object provides methods for test control.
+
+Main Methods:
+
+t.Error(args ...interface{}):
+    // Record failure and continue
+    if result != expected {
+        t.Error("Unexpected result")
+    }
+
+t.Errorf(format string, args ...interface{}):
+    // Format string like fmt.Printf
+    t.Errorf("Expected %d, got %d", expected, result)
+
+t.Fatal(args ...interface{}):
+    // Record failure and stop test
+    if file == nil {
+        t.Fatal("File not found")
+    }
+
+t.Fatalf(format string, args ...interface{}):
+    // Formatted failure and stop
+    t.Fatalf("Connection failed: %v", err)
+
+t.Skip(args ...interface{}):
+    // Skip this test
+    if os.Getenv("SKIP_SLOW") == "true" {
+        t.Skip("Skipping slow test")
+    }
+
+From api_test.go:
+    func TestAPICALL(t *testing.T) {
+        _, err := api.GetPrice("")
+        if err == nil {
+            t.Error("Error was not found!")  // Failure, continue
+        }
+    }
+
+TOPIC 5: EXTERNAL TEST PACKAGES
+==============================
+
+Test packages can be external to the code being tested.
+
+Internal Package Testing:
+    package api
+    func Unexported() { ... }
+    
+    package api  // Same package, can test unexported
+    func TestUnexported(t *testing.T) { ... }
+
+External Package Testing:
+    package api_test  // Different package (external)
+    
+    func TestAPICALL(t *testing.T) {
+        api.GetPrice("")  // Can only access exported
+    }
+
+From api_test.go:
+    package api_test  // External test package
+    
+    import (
+        "mod16/api"
+        "testing"
+    )
+    
+    func TestAPICALL(t *testing.T) {
+        _, err := api.GetPrice("")  // Testing exported function
+    }
+
+Benefits:
+1. Tests only exported API
+2. Testing black-box style
+3. Ensures public API is usable
+4. Can't rely on internal state
+
+When to Use:
+- Test public API only (api_test package)
+- Test internal functions (api package)
+- Most common: mix both approaches
+
+TOPIC 6: RUNNING TESTS
+=====================
+
+Go provides the `go test` command.
+
+Running All Tests in Package:
+    go test
+
+Running Tests in Current Directory:
+    go test ./...  // All packages
+
+Running Specific Test:
+    go test -run TestAPICALL
+
+Verbose Output:
+    go test -v  // Show test names and results
+
+Coverage Report:
+    go test -cover  // Show code coverage %
+    go test -coverprofile=coverage.out  // Detailed coverage
+
+From command line:
+    $ go test
+    // Output:
+    // ok  mod16/api  0.123s
+
+Test Output:
+    PASS - All tests passed
+    FAIL - Some tests failed
+    SKIP - Tests skipped
+
+TOPIC 7: EXAMPLE TEST - CHECKING SUCCESS/FAILURE
+==============================================
+
+From api_test.go - Testing for an erro:
+
+What It Tests:
+    func TestAPICALL(t *testing.T) {
+        _, err := api.GetPrice("")  // Pass empty string
+        if err == nil {
+            t.Error("Error was not found!")  // Should get error!
+        }
+    }
+
+Expected Behavior:
+- GetPrice("") should return an error
+- The function handles invalid input
+- Test verifies error handling
+
+Test Logic:
+1. Call api.GetPrice("") with invalid input
+2. If err == nil (no error), test fails
+3. If err != nil (error exists), test passes
+
+Why This Test?
+- Tests error handling
+- Empty currency is invalid
+- Should return an error, not crash
+
+TOPIC 8: TABLE-DRIVEN TESTS
+===========================
+
+Table-driven tests test multiple scenarios efficiently.
+
+Pattern:
+    func TestFunction(t *testing.T) {
+        tests := []struct {
+            input    string
+            expected bool
+            wantErr  bool
+        }{
+            {input: "inr", expected: true, wantErr: false},
+            {input: "usd", expected: true, wantErr: false},
+            {input: "", expected: false, wantErr: true},
+        }
+        
+        for _, tt := range tests {
+            result, err := Function(tt.input)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("Function(%q) error = %v", tt.input, err)
+            }
+        }
+    }
+
+Benefits:
+- Test many scenarios in one function
+- Easy to add new test cases
+- Clear test data
+- Better coverage with less code
+
+Example Applied to API:
+    func TestAPICALL(t *testing.T) {
+        tests := []struct {
+            currency string
+            wantErr  bool
+        }{
+            {"inr", false},
+            {"usd", false},
+            {"", true},  // Invalid
+            {"xyz", true}, // Invalid
+        }
+        
+        for _, tt := range tests {
+            _, err := api.GetPrice(tt.currency)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("GetPrice(%q) error = %v", tt.currency, err)
+            }
+        }
+    }
+
+TOPIC 9: TESTING BEST PRACTICES
+==============================
+
+1. One Test File Per Package:
+    api/ folder
+        api.go
+        api_test.go  // Tests in api_test package
+        response.go
+
+2. External Package for Exported API:
+    Write tests in api_test package (not api)
+    Tests only test exported functions
+    Black-box testing
+
+3. Descriptive Test Names:
+    Good: TestGetPriceWithValidCurrency
+    Bad: TestAPI
+
+4. Test Error Cases:
+    func TestGetPriceInvalidCurrency(t *testing.T) {
+        _, err := api.GetPrice("")
+        if err == nil {
+            t.Error("Expected error for empty currency")
+        }
+    }
+
+5. Use Table-Driven Tests:
+    Multiple scenarios in one test
+    Easy maintenance
+    Good organization
+
+6. Test Coverage:
+    Aim for high coverage
+    But focus on behavior, not percentages
+    `go test -cover`
+
+7. Run Tests Frequently:
+    Before commits
+    In CI/CD pipeline
+    During development
+
+TOPIC 10: TESTING WITH EXTERNAL DEPENDENCIES
+============================================
+
+Testing with API calls (integration test):
+
+Current Approach:
+    func TestAPICALL(t *testing.T) {
+        _, err := api.GetPrice("")  // Real API call
+    }
+
+Issues:
+- Depends on network availability
+- API might be down
+- Slow tests
+- Can't test error cases easily
+
+Better Approach (Mocking):
+    type MockAPI struct { ... }
+    func (m MockAPI) GetPrice(c string) (...) { ... }
+
+    func TestWithMock(t *testing.T) {
+        api := MockAPI{}
+        result := api.GetPrice("inr")
+        // Test with predictable results
+    }
+
+Go's Interface-Based Design:
+Go's interfaces enable easy mocking:
+
+    type Fetcher interface {
+        Fetch(url string) ([]byte, error)
+    }
+    
+    type MockFetcher struct { ... }
+    type RealFetcher struct { ... }
+    
+    // Test can use either
+
+From api_test.go:
+The test calls the real api.GetPrice() function.
+For better tests, would mock the HTTP call.
+
+TOPIC 11: RUNNING COMPREHENSIVE TESTS
+====================================
+
+Test Organization:
+    s16_testing/
+        api/
+            api.go
+            api_test.go
+        main.go
+        go.mod
+
+Running Tests from Root:
+    $ go test ./...
+    // Runs all tests in all packages
+
+Running Specific Package:
+    $ go test ./api
+    // Runs only api package tests
+
+With Coverage:
+    $ go test -cover ./...
+    // Shows coverage for all packages
+
+Output:
+    ok  model16/api        0.234s
+    ok  model16/main       0.001s
+    // Each package's test result
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Test files must end with _test.go suffix
+2. Test functions start with Test (capital T)
+3. Signature: func TestName(t *testing.T)
+4. t.Error() fails test but continues
+5. t.Fatal() fails test and stops
+6. t.Errorf() uses format strings (like Printf)
+7. Run tests: go test
+8. Run specific test: go test -run TestName
+9. Show coverage: go test -cover
+10. External test package tests only exported API
+11. Table-driven tests test multiple scenarios efficiently
+12. No external dependencies - testing built into Go
+
+================================================================================

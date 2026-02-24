@@ -1,0 +1,216 @@
+================================================================================
+SECTION 01: INPUT/OUTPUT & PACKAGE FUNDAMENTALS IN GO
+================================================================================
+
+TOPIC 1: PACKAGES AND MODULE ORGANIZATION
+==========================================
+
+In Go, a package is the fundamental organizational unit. The compiler sees packages, 
+not individual files. Multiple Go files can belong to the same package and share 
+the same namespace.
+
+Key Concepts:
+- All files in the same directory must declare the same package name at the top
+- Files in the same package are merged by the compiler at compile time
+- File organization is only for developer convenience; the compiler doesn't care
+
+Example from main.go:
+    package main
+    import "fmt"
+    import "mod1/data"
+
+All .go files in the same folder with "package main" are treated as one unit.
+
+TOPIC 2: VARIABLES - GLOBAL vs LOCAL
+=====================================
+
+Go supports two scopes of variables:
+
+GLOBAL VARIABLES (Package-level):
+- Declared outside functions
+- Accessible throughout the entire package
+- Visible to other packages if the name starts with uppercase
+- Example: var url string = "https://rahulkumarpahwa.me"
+
+LOCAL VARIABLES (Function-level):
+- Declared inside functions
+- Only accessible within that function
+- Limited scope improves code safety
+
+From main.go:
+    var url string = "https://rahulkumarpahwa.me"  // Package/Global variable
+    
+    func main() {
+        var message string = "..."  // Local variable
+        msg := "Hello world"         // Short declaration (inferred type)
+    }
+
+From functions.go:
+    var thisispackagevariable string = "..."  // Can be accessed from main.go
+
+TOPIC 3: BASIC PRINTING & OUTPUT
+=================================
+
+Go provides multiple ways to print output:
+
+1. print() - Low-level output, doesn't add newlines automatically
+   print("Hello from module.")      // No newline added
+   print(" hello \n")              // Must add \n manually
+
+2. println() - Adds newline automatically (preferred)
+   fmt.Println("This is the print statement")
+
+3. Raw String Literals - Using backticks
+   print(`hello \n`)  // Outputs literally: hello \n (backslash and n shown)
+   
+Regular strings process escape sequences:
+   print(" hello \n")  // Outputs: hello [newline]
+
+Raw string literals preserve everything as-is, useful for file paths and regex.
+
+TOPIC 4: CROSS-PACKAGE VARIABLE ACCESS
+=======================================
+
+To access variables from other packages:
+1. Variable name must start with UPPERCASE (exported)
+2. Reference: packageName.VariableName
+
+Example:
+    // In data/data.go
+    const Apple = "this is data package variable."
+    
+    // In main.go
+    fmt.Println("Variable from the data package: ", data.Apple)
+
+Note: Lowercase variables are unexported and not accessible from other packages.
+
+TOPIC 5: THE INIT() FUNCTION
+============================
+
+The init() function is a special function in Go:
+- Automatically executed before main() starts
+- Used for initialization logic
+- You can have MULTIPLE init() functions in the same package (unique feature of Go)
+- init() functions execute in the order they appear in the source
+
+Example from collections.go:
+    func init() {
+        Countries[0] = "argentina"
+        Countries[1] = "Spain"
+        Countries[4] = "USA"
+    }
+    
+    func init() {
+        Countries[9] = "India"
+        fmt.Println(len(Countries))  // Prints 10
+        Codes = make(map[int]string)
+        Codes[34] = "Apple"
+    }
+
+Execution flow:
+1. Both init() functions execute
+2. Then main() function executes
+
+TOPIC 6: DATA STRUCTURES & COLLECTIONS
+=======================================
+
+Go supports several collection types, defined at package level:
+
+ARRAYS:
+- Fixed size, contiguous elements
+- var Countries [10]string  // Array of 10 strings
+- Can access by index: Countries[0] = "argentina"
+
+SLICES:
+- Dynamic size, more flexible than arrays
+- var Slice []int  // Slice of integers
+- Can grow/shrink as needed
+
+MAPS:
+- Key-value pairs, unordered
+- var Codes map[int]string
+- Must be initialized with make() before use
+- Example: Codes[34] = "Apple"
+
+From collections.go:
+    var Countries [10]string        // Fixed array, 10 elements
+    var Slice []int                 // Dynamic slice
+    var Codes map[int]string        // Key-value map
+    
+    func init() {
+        Codes = make(map[int]string)  // Initialize map
+        Codes[34] = "Apple"            // Add key-value pair
+    }
+
+TOPIC 7: TYPE CONVERSION
+========================
+
+Go requires explicit type conversion. No automatic type promotion.
+
+Syntax: newType(value)
+
+From numbers.go:
+    func numbers() {
+        id := 4                    // int type
+        price := 45.4             // float64 type
+        
+        priceAsInt := int(price)        // Convert float64 to int (45)
+        idAsFloat := float32(id)        // Convert int to float32
+        
+        fmt.Println(id, price, priceAsInt, idAsFloat)
+        // Output: 4 45.4 45 4
+    }
+
+Note: Conversion truncates decimal places. 45.4 becomes 45 when converted to int.
+
+TOPIC 8: FUNCTION DECLARATIONS
+===============================
+
+Functions can be declared in the same package in different files.
+
+From functions.go:
+    func printData(data string) {
+        fmt.Println("The Data is : ", data)
+    }
+
+From main.go:
+    printData("Hello")  // Can call from main.go even though defined in functions.go
+
+This works because both files are in the same package. The compiler merges them.
+
+TOPIC 9: SHORT VARIABLE DECLARATION
+====================================
+
+Go provides a short syntax for variable declaration with type inference:
+
+Syntax: variable := value
+
+Example from main.go:
+    msg := "Hello world"
+
+The compiler infers:
+- Type: string
+- Value: "Hello world"
+- Scope: Local to main() function
+
+This is shorthand for:
+    var msg string = "Hello world"
+
+Short declaration is more commonly used in Go as it's concise and readable.
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. A package is the compiler's unit of organization, not individual files
+2. Package variables are accessible throughout the package
+3. Use uppercase names to export variables to other packages
+4. init() functions run before main() and can be multiple
+5. Use fmt.Println() for standard output
+6. Collections (arrays, slices, maps) are defined at package level
+7. Type conversion is explicit in Go: int(value)
+8. Multiple init() functions execute in source order, then main() runs
+9. Raw strings (backticks) preserve escape sequences literally
+10. Functions in same package can call each other regardless of file organization
+
+================================================================================

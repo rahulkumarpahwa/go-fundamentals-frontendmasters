@@ -1,0 +1,357 @@
+================================================================================
+SECTION 05: WRITING FILES & STRING FORMATTING
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section demonstrates writing files to the filesystem and formatting strings.
+Key concepts include:
+- Writing files with os.WriteFile()
+- File permissions
+- String formatting with fmt.Sprintf()
+- Converting types for file operations
+- Reading and processing file content
+
+This is essential for creating files, logging, and data export functionality.
+
+TOPIC 1: WRITING FILES
+====================
+
+The os.WriteFile() function writes content to a file on disk.
+
+Syntax:
+    os.WriteFile(filename, content, fileMode)
+
+Parameters:
+1. filename - string - Path to file to create/overwrite
+2. content - []byte - Data to write (must be bytes)
+3. fileMode - uint32 - File permissions (0644 is standard)
+
+Returns:
+- error - nil if successful, error object if failed
+
+From writer.go:
+    func writingFile(filename string, content string) error {
+        err := os.WriteFile(filename, []byte(content), 0644)
+        return err
+    }
+
+TOPIC 2: FILE PERMISSIONS (File Mode)
+====================================
+
+The third parameter in WriteFile specifies file permissions.
+
+Standard Values in Go:
+- 0644 - Regular file, owner read/write, others read only
+  Owner: rw- (read + write)
+  Group: r-- (read only)
+  Others: r-- (read only)
+
+- 0755 - Executable file, owner can do all, others read/execute
+  Owner: rwx (read + write + execute)
+  Group: r-x (read + execute)
+  Others: r-x (read + execute)
+
+From writer.go:
+    err := os.WriteFile(filename, []byte(content), 0644)
+    // 0644 is permissions: rw-r--r--
+
+Unix Permission Model:
+- First digit (0) - special permissions (usually 0)
+- Second digit (6) - owner permissions
+  4 = read, 2 = write, 1 = execute
+  6 = 4+2 = read + write
+- Third digit (4) - group permissions (4 = read only)
+- Fourth digit (4) - others permissions (4 = read only)
+
+Common Values:
+- 0644 - Standard file (rw-r--r--) - most common
+- 0755 - Executable (rwxr-xr-x)
+- 0600 - Private file (rw-------)
+
+TOPIC 3: BYTE CONVERSION FOR FILE WRITING
+=========================================
+
+os.WriteFile() requires []byte, not string.
+
+Converting String to Byte Slice:
+    []byte(stringValue)
+
+From writer.go:
+    content string = "..."
+    err := os.WriteFile(filename, []byte(content), 0644)
+    // []byte(content) converts string to byte slice
+
+Why This Is Needed:
+- Files are stored as bytes on disk
+- Strings in Go are UTF-8 text
+- Explicit conversion ensures proper encoding
+
+Example:
+    text := "Hello"
+    bytes := []byte(text)
+    // bytes = [72 101 108 108 111]
+    os.WriteFile("test.txt", bytes, 0644)
+    
+When you open test.txt:
+    Content: Hello
+
+TOPIC 4: FMT.SPRINTF() - FORMATTED STRINGS
+==========================================
+
+fmt.Sprintf() creates a formatted string without printing it.
+
+Syntax:
+    result := fmt.Sprintf(format, arguments)
+
+Returns:
+- String with formatted content
+
+From writer.go:
+    newString := fmt.Sprintf("original content : %v \nnew content, double of the original : %v\n%v ", 
+                             string(readFile), 
+                             string(readFile), 
+                             string(readFile))
+
+Compared to Other Functions:
+- fmt.Print() - Prints to terminal immediately
+- fmt.Printf() - Prints formatted to terminal
+- fmt.Sprintf() - Returns string (doesn't print)
+
+When to Use:
+- Creating formatted strings for files
+- Building log messages
+- Constructing SQL queries
+- Any time you need a formatted string in memory
+
+Format Specifiers:
+- %v - Any value (default format)
+- %d - Decimal integer
+- %s - String
+- %f - Float
+- %t - Boolean
+- %x - Hexadecimal
+
+TOPIC 5: ESCAPE SEQUENCES IN STRINGS
+===================================
+
+Special characters in strings:
+
+\n - Newline
+\t - Tab
+\\ - Backslash itself
+\" - Double quote
+\' - Single quote
+
+From writer.go:
+    fmt.Sprintf("original content : %v \nnew content, double of the original : %v\n%v ")
+    //                                    ^^                                      ^^^
+    // These \n create newlines in the output
+
+Example Execution:
+Input strings:
+    "original content : %v \nnew content, double of the original : %v\n%v "
+
+After fmt.Sprintf():
+    original content : this is the original content of the file.
+    new content, double of the original : this is the original content of the file.
+    this is the original content of the file.
+
+Written to File (newFile.txt):
+    original content : this is the original content of the file. 
+    new content, double of the original : this is the original content of the file.
+    this is the original content of the file.
+
+TOPIC 6: FLOATING-POINT FORMATTING
+=================================
+
+Converting floats to strings requires fmt.Sprintf().
+
+From fomattings.go:
+    value := 34.4447878
+    stringValue := fmt.Sprintf("%.2f", value)
+    fmt.Println(stringValue)  // Output: 34.44
+
+Format Specifier %.2f:
+- % - Start format specifier
+- .2 - 2 decimal places
+- f - Floating-point format
+
+Examples:
+    value := 34.4447878
+    
+    fmt.Sprintf("%.2f", value)   // "34.44"
+    fmt.Sprintf("%.4f", value)   // "34.4448"
+    fmt.Sprintf("%.0f", value)   // "34"
+    fmt.Sprintf("%f", value)     // "34.444788" (default 6 decimals)
+
+Why Not Direct Conversion?
+    stringValue := string(value)  // ERROR: Can't convert float to string directly
+    stringValue := fmt.Sprintf("%.2f", value)  // Correct approach
+
+TOPIC 7: COMPLETE FILE WRITING WORKFLOW
+======================================
+
+Step-by-Step Process:
+
+1. Read Original File:
+       readFile, _ := os.ReadFile("./text.txt")
+       // readFile is []byte
+
+2. Convert Bytes to String:
+       string(readFile)
+       // Now we can work with it as text
+
+3. Format the Content:
+       newString := fmt.Sprintf("Formatted: %v", string(readFile))
+
+4. Write to New File:
+       writingFile("./newFile.txt", newString)
+
+5. Function Handles Conversion:
+       func writingFile(filename string, content string) error {
+           err := os.WriteFile(filename, []byte(content), 0644)
+           return err
+       }
+
+Complete Code Flow:
+    
+    // main.go
+    readFile, _ := os.ReadFile("./text.txt")
+    // readFile = [116 104 105 115 32 105 115...]  (bytes)
+    
+    newString := fmt.Sprintf("original: %v \nnew: %v\n%v",
+                             string(readFile),  // Convert to string
+                             string(readFile),
+                             string(readFile))
+    // newString = "original: this is...\nnew: this is...\nthis is..."
+    
+    writingFile("./newFile.txt", newString)
+    // Calls: os.WriteFile("./newFile.txt", []byte(content), 0644)
+    // Creates newFile.txt with the formatted content
+
+Result:
+File newFile.txt is created with:
+    original content : this is the original content of the file. 
+    new content, double of the original : this is the original content of the file.
+    this is the original content of the file.
+
+TOPIC 8: ERROR HANDLING FOR FILE WRITING
+========================================
+
+WriteFile returns an error if operation fails:
+
+    err := os.WriteFile(filename, content, 0644)
+
+Possible Errors:
+- Permission denied - No write permission in directory
+- Disk full - No space available
+- Invalid path - Path doesn't exist
+- Read-only filesystem - Can't write to this location
+
+Proper Error Handling:
+    func writingFile(filename string, content string) error {
+        err := os.WriteFile(filename, []byte(content), 0644)
+        return err  // Return error to caller
+    }
+    
+    // In main:
+    err := writingFile("./newFile.txt", newString)
+    if err != nil {
+        fmt.Println("Failed to write file:", err)
+        panic(err)
+    }
+
+From main.go (current code):
+    writingFile("./newFile.txt", newString)
+    // Ignores error - Not best practice but works if success is guaranteed
+
+Better Implementation:
+    err := writingFile("./newFile.txt", newString)
+    if err != nil {
+        panic(err)
+    }
+
+TOPIC 9: IMPORT BLOCK SYNTAX
+===========================
+
+Go provides two import styles:
+
+Individual Imports:
+    import "fmt"
+    import "os"
+
+Import Block (Grouped):
+    import (
+        "fmt"
+        "os"
+    )
+
+From writer.go:
+    import (
+        "fmt"
+        "os"
+    )
+
+Benefits of Import Block:
+- Cleaner for multiple imports
+- Alphabetically organized
+- Easier to manage dependencies
+
+Both are equivalent; use block for readability.
+
+TOPIC 10: INTEGRATION WITH PREVIOUS CONCEPTS
+=========================================
+
+This section combines:
+
+Reading Files (from s04):
+    readFile, _ := os.ReadFile("./text.txt")
+
+Formatting (from s02):
+    fmt.Sprintf(format, args)
+
+Writing Files (new):
+    os.WriteFile(filename, content, mode)
+
+Error Handling (from s02):
+    err := function()
+    if err != nil { ... }
+
+Complete Integration:
+    func main() {
+        // Read
+        original, err := os.ReadFile("input.txt")
+        if err != nil {
+            panic(err)
+        }
+        
+        // Format
+        formatted := fmt.Sprintf("Processed: %v", string(original))
+        
+        // Write
+        err = os.WriteFile("output.txt", []byte(formatted), 0644)
+        if err != nil {
+            panic(err)
+        }
+    }
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. os.WriteFile(filename, []byte(content), 0644) writes files to disk
+2. Always convert strings to []byte: []byte(stringValue)
+3. File mode 0644 is standard: rw-r--r-- (owner read/write, others read)
+4. fmt.Sprintf() returns formatted string without printing
+5. Escape sequences (\n, \t, \\) work in format strings
+6. Floating-point: use "%.2f" to format to 2 decimals
+7. Can't convert float to string directly; use fmt.Sprintf()
+8. Always check WriteFile errors in production code
+9. Reading + formatting + writing is common workflow
+10. Escape sequences in strings appear in file output exactly as formatted
+11. Import block syntax is cleaner than individual imports
+12. []byte() conversion is required for file operations
+
+================================================================================

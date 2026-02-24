@@ -1,0 +1,399 @@
+================================================================================
+SECTION 09: EMBEDDING (GO'S APPROACH TO COMPOSITION)
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section introduces embedding in Go, which is the idiomatic way to achieve
+code reuse and type composition. Unlike traditional inheritance, embedding 
+provides a cleaner mechanism through type composition. Key concepts include:
+- Embedding syntax and behavior
+- Accessing embedded type fields
+- Method inheritance through embedding
+- Disambiguation with naming conflicts
+- Factory methods with embedded types
+
+Embedding is Go's solution to the inheritance problem.
+
+TOPIC 1: WHAT IS EMBEDDING?
+==========================
+
+Embedding is including another type directly in a struct without a field name.
+
+Traditional Approach (Composition):
+    type Workshop struct {
+        Course course.Course  // Named field
+        Date   time.Time
+    }
+    
+    // Access:
+    workshop.Course.Name
+    workshop.Course.Instructor
+
+Embedding Approach:
+    type Workshop struct {
+        course.Course  // Type without field name - EMBEDDED
+        Date   time.Time
+    }
+    
+    // Access:
+    workshop.Name              // Direct access!
+    workshop.Instructor        // Promoted fields
+    workshop.Date
+
+From workshop.go:
+    type Workshop struct {
+        course.Course  // Embedding - type only, no field name
+        Date   time.Time
+    }
+
+The Key Difference:
+- Composition: field has a name (c.Field.Subfield)
+- Embedding: no field name (c.Subfield)
+
+TOPIC 2: PROMOTED FIELDS
+=======================
+
+Embedded type fields are "promoted" to the parent type.
+
+From workshop.go Example:
+    type Workshop struct {
+        course.Course
+        Date time.Time
+    }
+
+All fields from Course become available directly:
+    workshop.Id          // From Course
+    workshop.Name        // From Course
+    workshop.Slug        // From Course
+    workshop.Legacy      // From Course
+    workshop.Duration    // From Course
+    workshop.Instructor  // From Course
+    workshop.Date        // Own field
+
+Benefits:
+- Automatic field promotion
+- Cleaner access pattern
+- Less nesting in code
+- More readable relationships
+
+From main.go Usage:
+    GoWorkshopClass2 := workshop.Workshop{}
+    GoWorkshopClass2.Name = "go fundamentals"  // Course field, promoted
+    GoWorkshopClass2.Instructor.FirstName = "Kyle"  // Course field promoted
+    GoWorkshopClass2.Legacy = true  // Course field, promoted
+    GoWorkshopClass2.Date = time.Now()  // Own field
+
+TOPIC 3: EMBEDDED TYPE METHODS
+=============================
+
+Methods of embedded types are also promoted.
+
+If Course has a String() method:
+    func (c Course) String() string {
+        return fmt.Sprintf("Course: %v", c.Name)
+    }
+
+Then Workshop automatically "inherits" it:
+    workshop := Workshop{}
+    fmt.Println(workshop)  // Calls Course.String() if Workshop has no String()
+
+From main.go Comment:
+    "also, note that when we embedded type then we also embedded
+     their stringer methods as well."
+
+Method Promotion:
+All public methods from embedded types become methods of the parent type.
+
+Example:
+    If Course has method: Course.GetDuration()
+    Then Workshop can call: workshop.GetDuration()
+
+Method Override:
+If the embedding struct defines its own method, it shadows the embedded method.
+
+From workshop.go:
+    // Course doesn't have String(), Workshop defines it
+    func (w Workshop) String() string {
+        return fmt.Sprintf("\nName of the Course : %v\n Instructor of the Course : %v",
+                          w.Name, w.Instructor.FirstName+" "+w.Instructor.LastName)
+    }
+
+TOPIC 4: EMBEDDING DEPTH (NESTED EMBEDDING)
+===========================================
+
+The promoted fields can themselves be embedded.
+
+Structure:
+    Instructor struct {
+        FirstName string
+        LastName string
+    }
+    
+    Course struct {
+        Instructor  // embedded
+        Name string
+    }
+    
+    Workshop struct {
+        Course      // embedded
+        Date time.Time
+    }
+
+Access Chain:
+    workshop.Name              // Course field, promoted from Course
+    workshop.FirstName         // Instructor field, promoted through Course
+    workshop.Instructor.FirstName  // Or explicit access
+
+From code:
+    w.Name                   // From Course through embedding
+    w.Instructor.FirstName   // Nested embedded access
+    
+These all work due to field promotion through the embedding chain.
+
+TOPIC 5: DISAMBIGUATION WITH NAMING CONFLICTS
+=============================================
+
+When embedded types have same field names, use dot notation to specify.
+
+Naming Conflict Example:
+    type Employee struct {
+        Name string
+    }
+    
+    type ExternalUser struct {
+        Name string  // Same field name!
+    }
+    
+    type CompoundStruct struct {
+        Employee
+        ExternalUser
+    }
+
+Accessing Fields:
+    c := CompoundStruct{}
+    c.Employee.Name         // Explicit: Employee's Name
+    c.ExternalUser.Name     // Explicit: ExternalUser's Name
+    // c.Name would be ambiguous - ERROR
+
+From workshop.go Comment:
+    "In case of multiple same properties in the struct itself and the struct
+     one which is embedded then we can use the '.' dot operator to get things
+     unambigious, to access the property of the particular struct."
+
+Best Practice:
+- Try to avoid naming conflicts
+- Use explicit access if conflicts occur
+- Consider renaming fields for clarity
+
+TOPIC 6: EMBEDDING FACTORY METHOD
+================================
+
+Factory methods work seamlessly with embedded types.
+
+From workshop.go:
+    func NewWorkShop(name string, instructor instructor.Instructor) Workshop {
+        w := Workshop{}
+        w.Name = name                    // Promoted Course field
+        w.Instructor = instructor        // Assignment to promoted field
+        return w
+    }
+
+How It Works:
+1. Create empty Workshop
+2. Set prompted fields directly
+3. Don't need to explicitly set Course
+4. Return the Workshop
+
+Usage from main.go:
+    jsInstructor := instructor.Instructor{FirstName: "Akshay", LastName: "Saini"}
+    jsWorkShop := workshop.NewWorkShop("Js WorkShop", jsInstructor)
+
+Key Points:
+- No need to pass nested structs explicitly
+- Promoted fields are set directly
+- Factory simplifies creation of complex nested types
+- Reduces boilerplate code
+
+TOPIC 7: ACCESSING EMBEDDED FIELDS DURING INITIALIZATION
+====================================================
+
+When creating embedded structs, handle nested access carefully.
+
+What Does NOT Work:
+    GoWorkshopClass := workshop.Workshop{
+        Name: "go fundamentals",  // ERROR: Which struct owns Name?
+        FirstName: "Kyle"           // Ambiguous
+    }
+
+What Works:
+    GoWorkshopClass := workshop.Workshop{}
+    GoWorkshopClass.Name = "go fundamentals"
+    GoWorkshopClass.Instructor.FirstName = "Kyle"
+
+Or with factory:
+    jsWorkShop := workshop.NewWorkShop("Js WorkShop", jsInstructor)
+
+From main.go Comment:
+    "note : don't try to pass 'Course' properties in 'workshop.Workshop{}'
+     directly here, it will not work."
+
+Reason:
+During struct literal initialization, promoted fields aren't recognized.
+Must assign after creation or use factory.
+
+TOPIC 8: EMBEDDING VS COMPOSITION
+===============================
+
+Understanding the choice between embedding and composition:
+
+COMPOSITION (Traditional):
+    type Workshop struct {
+        Course Course        // Named field
+        Date   time.Time
+    }
+    
+    // Access:
+    w.Course.Name
+    w.Course.Instructor.FirstName
+    w.Date
+
+EMBEDDING:
+    type Workshop struct {
+        Course              // Unnamed - EMBEDDED
+        Date   time.Time
+    }
+    
+    // Access:
+    w.Name
+    w.Instructor.FirstName
+    w.Date
+
+When to Use COMPOSITION:
+- Relationship is explicit and important
+- Want to treat the nested type as a complete unit
+- May replace the nested value entirely
+
+When to Use EMBEDDING:
+- Want to extend/enhance the embedded type
+- Want simplified field access
+- Logical extension or specialization
+
+From main.go:
+    // Old way (composition):
+    // goCourse := course.Course{Name: "go fundamentals", Instructor: instructor}
+    // GoWorkshopClass := workshop.Workshop{Course: goCourse, Date: time.Now()}
+
+    // New way (embedding):
+    GoWorkshopClass2 := workshop.Workshop{}
+    GoWorkshopClass2.Name = "go fundamentals"
+
+TOPIC 9: IMPLICIT INTERFACE IMPLEMENTATION WITH EMBEDDING
+======================================================
+
+Embedded types' interface implementations work implicitly on parent type.
+
+Example:
+    // io package
+    type Reader interface {
+        Read(p []byte) (n int, err error)
+    }
+    
+    type MyReader struct { ... }
+    func (r MyReader) Read(p []byte) (n int, err error) { ... }
+    
+    // Now embedding MyReader makes wrapper implement Reader
+    type Wrapper struct {
+        MyReader  // EMBEDDED
+    }
+    
+    w := Wrapper{MyReader: myReader}
+    // w automatically implements Reader interface
+
+From main.go:
+    jsWorkShop := workshop.NewWorkShop("Js WorkShop", jsInstructor)
+    fmt.Println(jsWorkShop)  // Calls embedded Core.String() or Workshop.String()
+
+TOPIC 10: REAL-WORLD PATTERNS
+===========================
+
+Common embedding patterns:
+
+1. Extension Through Embedding:
+    type Employee struct {
+        Name string
+        ID   int
+    }
+    
+    type Manager struct {
+        Employee      // EMBEDDED
+        Department string
+        Reports     int
+    }
+    // Manager IS-A Employee plus more
+    m := Manager{}
+    m.Name = "John"  // From Employee
+
+2. Wrapper Around Interface:
+    type ResponseWriter interface { ... }
+    
+    type LoggingWriter struct {
+        ResponseWriter  // EMBEDDED interface
+    }
+    // Can wrap other ResponseWriters
+
+3. Mixing Concerns:
+    type Auditable struct {
+        CreatedAt time.Time
+        CreatedBy string
+    }
+    
+    type DocumentWithAudit struct {
+        Document     // EMBEDDED
+        Auditable    // EMBEDDED
+    }
+
+From code:
+    type Workshop struct {
+        course.Course  // Extending Course with additional fields
+        Date time.Time
+    }
+
+TOPIC 11: SUMMARY OF EMBEDDING RULES
+==================================
+
+Key Rules:
+1. Embedding: include type without field name
+2. Promotion: embedded fields/methods promoted to parent
+3. Access: use promoted fields directly or explicit path
+4. Methods: embedded methods work on parent type
+5. Shadowing: parent methods shadow embedded methods
+6. Conflict: use explicit path for naming conflicts
+7. Initialization: promoted fields in literal requires careful handling
+8. Factory: recommended for complex embedded types
+
+Go Composition Philosophy:
+- Prefer composition over inheritance
+- Use embedding for type extension
+- Keep it simple and explicit
+- Avoid deep embedding chains
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Embedding includes type without field name: type Parent struct { Child }
+2. Embedded fields are "promoted" to parent: p.Field instead of p.Child.Field
+3. Embedded methods work on parent type automatically
+4. Parent methods shadow embedded methods (method override)
+5. For naming conflicts, use explicit dot notation: p.Child.Field
+6. Embedded types' interface implementations promote to parent
+7. Can't use promoted fields in struct literals - assign after creation
+8. Factory methods simplify creation of complex embedded types
+9. Embedding depth works through chains of embedded types
+10. Choose embedding for IS-A relationships, composition for HAS-A
+11. Go prefers structural composition over inheritance
+12. Embedding provides code reuse without the complexity of inheritance
+
+================================================================================

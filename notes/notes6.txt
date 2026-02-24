@@ -1,0 +1,358 @@
+================================================================================
+SECTION 06: CUSTOM TYPES & METHODS
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section introduces creating custom types in Go and attaching methods to those
+types. Key concepts include:
+- Type aliases
+- Creating new types from built-in types
+- Semantic meaning through type systems
+- Methods on types (receivers)
+- Type conversions
+
+Custom types enable domain-specific code that's more readable and type-safe.
+
+TOPIC 1: TYPE ALIASES
+====================
+
+A type alias creates a new name for an existing type.
+
+Syntax:
+    type AliasName = ExistingType
+
+From main.go:
+    type integer = int
+    type json = map[string]string
+
+Using Type Aliases:
+    var x integer  // x is an int, just with a different name
+    var data json  // data is a map[string]string with alias name
+
+Important Notes:
+- The alias and original type are IDENTICAL
+- Can use interchangeably: int and integer are the same
+- Useful for:
+  - Shortening long type names: type JSONMap = map[string]interface{}
+  - Semantic clarity in code
+  - Reducing clutter in declarations
+
+Example:
+    type Database = map[string]interface{}
+    var db Database  // Much clearer than bare map
+    // db and a plain map[string]interface{} are truly identical
+
+TOPIC 2: CUSTOM TYPES FROM BUILT-INS
+====================================
+
+Create entirely new types based on built-in types.
+
+Syntax:
+    type TypeName BaseType
+
+From main.go:
+    type distance float64
+    type distanceKm float64
+
+These Create New Types:
+    d := distance(6.4)        // 6.4 as a distance (float64-based)
+    km := distanceKm(10.2)    // 10.2 as a distanceKm (float64-based)
+
+Key Difference from Aliases:
+- NOT identical to the base type
+- Requires explicit conversion
+- Creates its own type identity
+
+Conversion Between Custom Types:
+    d := distance(5.0)
+    km := distanceKm(d)  // Requires explicit cast
+    // ERROR: km := d    (cannot implicitly convert distance to distanceKm)
+
+Automatic Type Conversion:
+Go automatically creates a convertor function:
+    distance(6.4)  // Converts float64 to distance type
+    float64(d)     // Converts distance back to float64
+
+TOPIC 3: SEMANTIC MEANING THROUGH TYPES
+======================================
+
+Custom types add semantic meaning and context to values.
+
+From main.go:
+    type distance float64      // Represents distance in miles
+    type distanceKm float64    // Represents distance in kilometers
+
+Semantic Differences:
+    milesValue := distance(5.0)    // Represents 5 miles
+    kmValue := distanceKm(8.0)     // Represents 8 kilometers
+    
+    // Same underlying type (float64), but different meaning
+    // Can't accidentally mix them where not intended
+
+Benefits:
+1. Type Safety - Compiler prevents mixing incompatible types
+2. Readability - Code documents intent: distance vs distanceKm
+3. Methods - Can attach methods to specific types
+4. API Clarity - Function signatures are self-documenting
+
+Bad Approach (No Semantic Meaning):
+    func convert(miles float64) float64 {
+        return 1.60934 * miles
+    }
+    // What units? What does return represent? Unclear!
+
+Good Approach (With Semantic Types):
+    func (miles distance) Tokm2() distanceKm {
+        return distanceKm(1.60934 * miles)
+    }
+    // Clear: takes distance (miles), returns distanceKm
+
+TOPIC 4: METHODS ON TYPES
+========================
+
+Methods are functions attached to a specific type.
+
+Syntax - Method Declaration:
+    func (receiver ReceiverType) MethodName(params) ReturnType {
+        // method body
+    }
+
+Where:
+- receiver - Variable name representing the type instance
+- ReceiverType - The type this method is attached to
+- MethodName - Name of the method
+- params - Parameters (optional)
+- ReturnType - Return type (optional)
+
+From main.go:
+    func (miles distance) Tokm2() distanceKm {
+        return distanceKm(1.60934 * miles)
+    }
+
+Breaking It Down:
+- (miles distance) - Receiver: miles is the distance instance
+- Tokm2() - Method name
+- distanceKm - Return type
+- Inside: can use "miles" as the instance value
+
+Usage:
+    d := distance(5.0)
+    km := d.Tokm2()  // Call method using dot notation
+    // Equivalent to: km := Tokm2(d)
+
+TOPIC 5: RECEIVER SEMANTICS
+==========================
+
+The receiver is the first parameter and goes before the method name.
+
+Comparison with Regular Functions:
+
+Function Style:
+    func ToKm(miles distance) distanceKm {
+        return distanceKm(1.60934 * miles)
+    }
+    
+    Usage: km := ToKm(d)
+
+Method Style:
+    func (miles distance) Tokm2() distanceKm {
+        return distanceKm(1.60934 * miles)
+    }
+    
+    Usage: km := d.Tokm2()
+
+Both are Valid:
+Go doesn't enforce one style. Choose what's clearest for your API.
+
+Receiver Naming Convention:
+- Use a short noun referring to the type instance
+- Single letter is common for simple types
+- Examples:
+  type Person struct { ... }
+  func (p Person) Start() { ... }  // p for person
+  
+  type Stack struct { ... }
+  func (s Stack) Push(v) { ... }   // s for stack
+
+TOPIC 6: MULTIPLE METHODS ON SAME TYPE
+======================================
+
+You can attach multiple methods to the same type.
+
+From main.go:
+    func (miles distance) Tokm2() distanceKm {
+        return distanceKm(1.60934 * miles)  // Convert miles to km
+    }
+    
+    func (km distanceKm) ToMiles() distance {
+        return distance(0.62137119 * km)    // Convert km to miles
+    }
+
+Calling Multiple Methods:
+    milesDist := distance(5.0)
+    
+    // Method 1: miles.Tokm2()
+    kmDist := milesDist.Tokm2()
+    
+    // Method 2: km.ToMiles()
+    backToMiles := kmDist.ToMiles()
+
+Each type can have many methods:
+    type distance float64
+    // - Tokm2()
+    // - String()
+    // - Validate()
+    // - etc.
+
+TOPIC 7: METHOD CALLS SYNTAX
+===========================
+
+Methods are called using dot notation, just like objects in other languages.
+
+Syntax:
+    instance.Method(arguments)
+
+From main.go:
+    d := distance(6.4)
+    distanceInKm := d.Tokm2()
+    // d.Tokm2() calls the Tokm2() method on the distance instance d
+
+Two Ways to Call a Method:
+    km := distanceKm(10.0)
+    
+    // Way 1: Direct method call (preferred)
+    miles := km.ToMiles()
+    
+    // Way 2: Full function-style call (also valid)
+    miles := distanceKm.ToMiles(km)
+    // Shows that method is actually a function with receiver as first arg
+
+From main.go:
+    fmt.Println("Distance in Miles from km : ", distanceKm.ToMiles(distanceInKm))
+    // or :
+    fmt.Println("Distance in Miles from km : ", distanceInKm.ToMiles())
+
+Both are valid and produce the same result.
+
+TOPIC 8: EXAMPLE: LOCATION TYPE WITH METHODS
+============================================
+
+From example.go:
+    type Location string
+    
+    func (location Location) DistanceTo(destination Location) distance {
+        fmt.Printf("Origin %v Destination %v\n", location, destination)
+        return 10
+    }
+    
+    func locationTest() {
+        nyc := Location("34.99, 889.00")
+        nyc.DistanceTo(Location("78.99, 89.99"))
+    }
+
+Breaking It Down:
+
+Type Definition:
+    type Location string
+    // Location is a string type with semantic meaning
+
+Method Creation:
+    func (location Location) DistanceTo(destination Location) distance
+    // Takes a Location instance and another Location
+    // Returns a distance value
+
+Usage:
+    nyc := Location("34.99, 889.00")  // Create a Location
+    nyc.DistanceTo(Location("78.99, 89.99"))  // Call method
+    // Output: Origin 34.99, 889.00 Destination 78.99, 89.99
+
+This demonstrates:
+- Creating custom type from string
+- Attaching method to type
+- Using dot notation for method calls
+- Methods can accept and return custom types
+
+TOPIC 9: CONVERSION CHAIN
+========================
+
+Types can be converted through a chain to achieve complex transformations.
+
+Example Flow:
+    miles := distance(6.4)
+    
+    // Step 1: miles (distance)
+    km := miles.Tokm2()
+    // Step 2: km (distanceKm)
+    
+    backToMiles := km.ToMiles()
+    // Step 3: backToMiles (distance)
+    
+    fmt.Println(backToMiles)  // Approximately 6.4
+
+Type Conversion Chain:
+    distance ──Tokm2()──> distanceKm ──ToMiles()──> distance
+
+This demonstrates:
+- Methods return different types
+- Can chain method calls
+- Can create round-trip conversions
+
+TOPIC 10: PRACTICAL USE CASES FOR CUSTOM TYPES
+============================================
+
+When to CREATE CUSTOM TYPES:
+
+1. Domain-Specific Values:
+    type Temperature float64  // Represents temperature
+    type Money float64        // Represents money
+    // Prevent mixing unrelated values
+
+2. Distinct Representations:
+    type MilesPerHour float64  // Speed
+    type KilometersPerHour float64  // Same underlying type, different meaning
+
+3. API Clarity:
+    // Bad:
+    func SendNotification(string, string, string) error
+    // What are these strings?
+    
+    // Good:
+    type Email string
+    type Subject string
+    type Body string
+    func SendNotification(email Email, subject Subject, body Body) error
+
+4. Methods for Behavior:
+    type User struct { ... }
+    func (u User) IsAdmin() bool { ... }
+    func (u User) CanEdit() bool { ... }
+
+5. Validation:
+    type Age int
+    func NewAge(val int) (Age, error) {
+        if val < 0 || val > 150 {
+            return 0, errors.New("invalid age")
+        }
+        return Age(val), nil
+    }
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Type aliases (=) create alternative names: type json = map[string]string
+2. Custom types create new types: type distance float64
+3. Custom types aren't identical to base type - requires explicit conversion
+4. Methods attach functions to types using receiver syntax: func (r Type) Method()
+5. Methods are called with dot notation: instance.Method(args)
+6. Semantic types add meaning: distance vs distanceKm vs speed
+7. Multiple methods can be attached to the same type
+8. Methods are really functions with a special first parameter (receiver)
+9. Can call method as: instance.Method() OR Type.Method(instance)
+10. Type system prevents mixing incompatible values (type safety)
+11. Custom types improve code readability and API clarity
+12. Receiver naming convention uses short nouns representing the type
+
+================================================================================

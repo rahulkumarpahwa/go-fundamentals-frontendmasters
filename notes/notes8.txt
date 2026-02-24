@@ -1,0 +1,407 @@
+================================================================================
+SECTION 08: FACTORY PATTERN
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section introduces the factory pattern in Go. Since Go doesn't have 
+constructors, the factory pattern is the idiomatic way to create and initialize
+structs with custom logic. Key concepts include:
+- Factory functions and their naming convention
+- The String() method for custom string representation
+- The Stringer interface (implicit implementation)
+- Best practices for struct creation
+- Package-based factory organization
+
+The factory pattern ensures structs are created with proper initialization.
+
+TOPIC 1: THE FACTORY PATTERN CONCEPT
+===================================
+
+A factory is a function that creates and returns struct instances.
+
+Why Factories?
+- Go has no constructors
+- Need to validate input before creating structs
+- Want consistent initialization logic
+- Ensure only required fields are provided
+- Hide implementation details
+
+From main.go Comment:
+    "we don't have the constructer in the struct but we have the design pattern
+     to create the factories. It is method which will create the struct"
+
+The Factory Function:
+    func NewTypeName(parameters) TypeName {
+        // Perform any needed initialization
+        // Validation logic
+        // Set defaults
+        return TypeName{ ... }
+    }
+
+TOPIC 2: NAMING CONVENTION FOR FACTORIES
+=======================================
+
+The "New" Prefix Convention:
+
+Function Name: NewTypeName
+- Starts with "New"
+- Followed by the struct type name
+- Signals: "This creates a new instance"
+
+From main.go:
+    func NewInstructor(firstName string, lastName string) Instructor {
+        return Instructor{FirstName: firstName, LastName: lastName}
+    }
+
+From Example/Teacher.go:
+    func New(firstName string, lastName string) Teacher {
+        return Teacher{FirstName: firstName, LastName: lastName}
+    }
+
+Usage Pattern:
+    // Clear intent: creating new instance
+    kyle := NewInstructor("Kyle", "Simpson")
+    rahul := teacher.New("rahul", "kumar")
+
+When the factory is the only exported function in a package, "New" is sufficient:
+    package instructor
+    
+    func New(firstName string) Instructor { ... }
+    
+    // Usage:
+    instructor.New("John")
+
+TOPIC 3: SIMPLE FACTORY IMPLEMENTATION
+======================================
+
+The simplest factory just returns a struct with provided values.
+
+From main.go:
+    func NewInstructor(firstName string, lastName string) Instructor {
+        return Instructor{FirstName: firstName, LastName: lastName}
+    }
+
+Usage:
+    kyle := NewInstructor("Kyle", "Simpson")
+    // Creates: Instructor{
+    //   Id: 0,         (zero value)
+    //   FirstName: "Kyle",
+    //   LastName: "Simpson",
+    //   Score: 0       (zero value)
+    // }
+
+What It Does:
+1. Takes parameters (firstName, lastName)
+2. Creates struct with those values
+3. Returns the new instance
+
+Benefits:
+- Minimal but complete
+- Only provides necessary fields
+- Caller doesn't need to know struct field names
+- Returns struct directly (not pointer)
+
+TOPIC 4: FACTORY WITH PACKAGE ORGANIZATION
+===========================================
+
+When to use dedicated packages for factories:
+
+Bad Approach:
+    // main.go with all factories
+    func NewUser(...) User { ... }
+    func NewProduct(...) Product { ... }
+    func NewOrder(...) Order { ... }
+
+Better Approach:
+    // user/new.go
+    func New(name string) User { ... }
+    
+    // product/new.go
+    func New(name string) Product { ... }
+    
+    // order/new.go
+    func New(items []Item) Order { ... }
+
+From main.go Comment:
+    "Some developers are creating a data package in general. Some developers
+     are creating one package per model. If the package has only the struct,
+     then the package can be called instructor. If that's the case, then you
+     can use directly something like 'instructor.New'"
+
+Example from Example/Teacher.go:
+    // File: Example/teacher.go
+    package teacher
+    
+    type Teacher struct {
+        FirstName string
+        LastName  string
+    }
+    
+    func New(firstName string, lastName string) Teacher {
+        return Teacher{FirstName: firstName, LastName: lastName}
+    }
+
+Usage in main.go:
+    import "mod8/Example" as teacher
+    
+    rahul := teacher.New("rahul", "kumar")
+
+Benefits of Package Approach:
+- Cleaner API: package.New() is simpler
+- Encapsulation: only the struct and factory are exported
+- Organization: one model per package
+- Flexibility: can add more methods later
+
+TOPIC 5: FACTORY WITH COMPLEX INITIALIZATION
+============================================
+
+Factories can do more than just assign values.
+
+Example with Validation (not in code, but important pattern):
+    func NewUser(email string, password string) (User, error) {
+        // Validate input
+        if !isValidEmail(email) {
+            return User{}, fmt.Errorf("invalid email")
+        }
+        
+        if len(password) < 8 {
+            return User{}, fmt.Errorf("password too weak")
+        }
+        
+        // Create with validated data
+        return User{
+            Email: email,
+            Password: hashPassword(password),
+            CreatedAt: time.Now(),
+        }, nil
+    }
+
+Usage Pattern:
+    user, err := NewUser("test@example.com", "password123")
+    if err != nil {
+        panic(err)
+    }
+
+Advanced Factory Features:
+1. Validation - Check inputs
+2. Default Values - Set sensible defaults
+3. Derived Values - Calculate fields
+4. Error Returns - Handle invalid cases
+5. Pointer Returns - For large structs
+
+TOPIC 6: THE STRING() METHOD
+===========================
+
+The String() method defines custom string representation for a type.
+
+Syntax:
+    func (receiver TypeName) String() string {
+        return "formatted string"
+    }
+
+From course.go:
+    func (c Course) String() string {
+        return fmt.Sprintf("----%v------\n by ------%v------", 
+                          c.Name, c.Instructor.FirstName)
+    }
+
+Similar to:
+- Java: toString()
+- Python: __str__()
+- JavaScript: toString()
+
+Purpose:
+- Control how type appears when printed
+- Create human-readable output
+- Format complex structures nicely
+
+TOPIC 7: THE STRINGER INTERFACE
+==============================
+
+The Stringer interface defines types that can convert to string.
+
+Interface Definition (built-in to Go):
+    type Stringer interface {
+        String() string
+    }
+
+Implicit Implementation:
+Go types automatically implement interfaces if they have the required methods.
+No explicit declaration needed.
+
+From main.go Comment:
+    "That's because of implicit interface implementation in Go.
+     The Course type has a String() method defined (in course.go).
+     In Go, when a type implements the Stringer interface
+     (which requires a String() string method),
+     the fmt package automatically calls it—even if you don't
+     explicitly invoke .String()."
+
+Automatic Invocation:
+    course := Course{Name: "Go Basics", Instructor: kyle}
+    
+    // Both produce the same output:
+    fmt.Println(course)              // Calls String() automatically
+    fmt.Println(course.String())     // Explicit call
+    
+    // Output:
+    // ----Go Basics------
+    //  by ------Kyle------
+
+How fmt.Println Works:
+1. Check if value implements Stringer interface
+2. If yes, automatically call String() method
+3. Use returned string for output
+4. If no, use default representation
+
+TOPIC 8: COURSE STRUCT EXAMPLE
+============================
+
+From course.go:
+    type Duration float32  // Custom type: hours
+    
+    type Course struct {
+        Id         int
+        Name       string
+        Slug       string
+        Legacy     bool
+        Duration   Duration
+        Instructor Instructor
+    }
+
+Key Features:
+1. Custom Type Field (Duration)
+2. Embedded Struct (Instructor)
+3. Multiple Field Types
+4. String() Method for formatting
+
+From main.go Usage:
+    goCourse := Course{
+        Name: "Go course",
+        Instructor: kyle
+    }
+    
+    fmt.Println(goCourse)          // Uses String() automatically
+    fmt.Println(goCourse.String()) // Explicit call
+
+Output:
+    ----Go course------
+     by ------Kyle------
+
+TOPIC 9: COMPOSITE STRUCTS (EMBEDDING)
+======================================
+
+Structs can contain other structs.
+
+From course.go:
+    type Course struct {
+        ...
+        Instructor Instructor  // Contains another struct
+    }
+
+Creating Composite Structs:
+    kyle := Instructor{FirstName: "Kyle", LastName: "Simpson"}
+    course := Course{
+        Name: "Go course",
+        Instructor: kyle
+    }
+
+Accessing Nested Fields:
+    fmt.Println(course.Instructor.FirstName)  // Output: Kyle
+
+This allows:
+- Organizing related data
+- Reusing struct definitions
+- Modeling hierarchical relationships
+
+TOPIC 10: CUSTOM TYPES WITHIN STRUCTS
+====================================
+
+Structs can use custom types as fields.
+
+From course.go:
+    type Duration float32  // Custom type
+    
+    type Course struct {
+        Duration Duration  // Uses custom type
+    }
+
+Example Usage:
+    course := Course{
+        Duration: Duration(42.5)  // 42.5 hours
+    }
+
+Benefits:
+1. Semantic Meaning - Duration clearly indicates units
+2. Type Safety - Can't accidentally mix hours with other floats
+3. Methods - Can add Duration-specific methods
+4. Validation - Factory can validate duration values
+
+TOPIC 11: FACTORY VS DIRECT INSTANTIATION
+==========================================
+
+When to Use Factories:
+
+USE FACTORIES:
+    // Complex initialization
+    func NewUser(email, pass string) (User, error) {
+        // Validation and setup
+    }
+    
+    // Sensible defaults
+    func NewConfig() Config {
+        return Config{
+            Timeout: 30,
+            Retries: 3,
+            LogLevel: "INFO",
+        }
+    }
+    
+    // When struct should be in another package
+    package jwt
+    func New(secret string) Token {
+        return Token{secret: secret}
+    }
+
+DIRECT INSTANTIATION (OK):
+    // Simple cases, well-known fields
+    logger := Logger{Name: "app"}
+    
+    // Struct won't be exported
+    var internal internalConfig
+    
+    // In same package, developer knows structure
+
+From main.go Examples:
+    // Factory used
+    kyle := NewInstructor("Kyle", "Simpson")
+    
+    // Direct instantiation (simple case)
+    goCourse := Course{Name: "Go course", Instructor: kyle}
+
+Best Practice:
+- Use factories for exported types
+- Use direct instantiation for internal types
+- Use factory if initialization logic exists
+- Use direct instantiation for simple data grouping
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Factory pattern creates and initializes structs (Go replacement for constructors)
+2. Name factories with "New" prefix: NewTypeName(...)
+3. Simple factories just assign provided values to struct fields
+4. Complex factories validate input and set defaults
+5. Package-based factories use just "New()" as function name
+6. String() method defines custom string representation (like toString)
+7. Stringer interface requires String() string method
+8. fmt.Println automatically calls String() if it exists
+9. Structs can contain other structs (composition/embedding)
+10. Custom types can be used as struct fields for semantic meaning
+11. Both factory and direct instantiation have their place
+12. Factories are idiomatic Go for struct creation
+
+================================================================================

@@ -1,0 +1,426 @@
+================================================================================
+SECTION 13: API CLIENT (CONSUMING EXTERNAL APIS)
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section creates a practical API client that fetches exchange rates from 
+an external API, parses JSON responses, and models the data in custom structs.
+Key concepts include:
+- HTTP GET requests using the net/http package
+- Reading and parsing JSON responses
+- Struct tags for JSON mapping
+- Error handling for network requests
+- Type conversion and pointers
+
+This introduces real-world network programming in Go.
+
+TOPIC 1: HTTP REQUESTS IN GO
+===========================
+
+Go's net/http package provides built-in HTTP functionality.
+
+Making a GET Request:
+    import "net/http"
+    
+    response, error := http.Get(url)
+
+From cex.go:
+    res, err := http.Get(fmt.Sprintf(apiURL, currencyUpper))
+
+Key Points:
+- http.Get() is a FUNCTION, not a method
+- Returns (response, error)
+- Handles both http and https protocols
+- No external dependencies needed
+
+HTTP Methods Available:
+    http.Get(url)                    // GET request
+    http.Post(url, contentType, body)  // POST request
+    http.Head(url)                   // HEAD request
+    // For custom verbs, use http.NewRequest()
+
+TOPIC 2: DYNAMIC URLS WITH FORMAT STRINGS
+==========================================
+
+Building URLs with variables:
+
+Using fmt.Sprintf():
+    apiURL := "https://open.er-api.com/v6/latest/%s"
+    currencyUpper := "USD"
+    
+    fullURL := fmt.Sprintf(apiURL, currencyUpper)
+    // Result: "https://open.er-api.com/v6/latest/USD"
+
+From cex.go:
+    const apiURL = "https://open.er-api.com/v6/latest/%s"
+    currencyUpper := strings.ToUpper(currency)
+    res, err := http.Get(fmt.Sprintf(apiURL, currencyUpper))
+
+String Manipulation:
+    strings.ToUpper(text)    // Convert to uppercase
+    strings.ToLower(text)    // Convert to lowercase
+    strings.TrimSpace(text)  // Remove whitespace
+
+From cex.go:
+    currencyUpper := strings.ToUpper(currency)  // "inr" -> "INR"
+
+TOPIC 3: READING HTTP RESPONSE BODY
+==================================
+
+HTTP responses come as streams - must read completely:
+
+Sequential Reading:
+    import "io"
+    
+    bodyBytes, err := io.ReadAll(res.Body)
+    // Blocks until entire response is read
+
+From cex.go:
+    bodyBytes, err := io.ReadAll(res.Body)
+    if err != nil {
+        return nil, err
+    }
+
+Why ReadAll()?
+HTTP body comes in chunks over TCP network:
+- Could read line by line manually
+- Or use io.ReadAll() to synchronously read everything
+- Creates byte slice of entire response body
+
+Converting to String:
+    bodyString := string(bodyBytes)  // []byte to string conversion
+
+TOPIC 4: HTTP STATUS CODES
+==========================
+
+HTTP responses include status codes indicating success/failure:
+
+Common Status Codes:
+    200 OK              - Everything is fine
+    201 Created         - Resource created
+    400 Bad Request     - Invalid request
+    401 Unauthorized    - Authentication required
+    404 Not Found       - Resource doesn't exist
+    500 Server Error    - Server problem
+
+Checking Status in Go:
+    if res.StatusCode == http.StatusOK {
+        // Handle success (200)
+    } else {
+        // Handle error
+        return nil, fmt.Errorf("Status Code: %v", res.StatusCode)
+    }
+
+From cex.go:
+    if res.StatusCode == http.StatusOK {
+        // Parse response
+    } else {
+        return nil, fmt.Errorf("Status Code recieved : %v", res.StatusCode)
+    }
+
+TOPIC 5: JSON ENCODING/DECODING
+==============================
+
+Working with JSON data:
+
+JSON Structure (from api_structure.json):
+    {
+        "result": "success",
+        "base_code": "INR",
+        "rates": {
+            "USD": 0.010995,
+            "GBP": 0.008154,
+            "EUR": 0.009338,
+            ...
+        }
+    }
+
+Unmarshaling (Parse JSON to Struct):
+    var data StructType
+    err := json.Unmarshal(jsonBytes, &data)
+
+From cex.go:
+    var apiResponse APIResponse
+    err = json.Unmarshal(bodyBytes, &apiResponse)
+
+Marshaling (Struct to JSON):
+    jsonBytes, err := json.Marshal(data)
+
+TOPIC 6: JSON STRUCT TAGS FOR MAPPING
+====================================
+
+Struct tags map JSON fields to struct fields.
+
+Without Tags (Names Must Match Exactly):
+    type Response struct {
+        Result string     // Must match "Result" in JSON
+        Rates  map[string]float64
+    }
+
+With Tags (Flexible Mapping):
+    type Response struct {
+        Result   string             `json:"result"`      // Maps to "result"
+        Provider string             `json:"provider"`    // Maps to "provider"
+        BaseCode string             `json:"base_code"`   // Maps to "base_code"
+        Rates    map[string]float64 `json:"rates"`       // Maps to "rates"
+    }
+
+From response.go:
+    type APIResponse struct {
+        Result   string              `json:"result"`
+        Provider string              `json:"provider"`
+        BaseCode string              `json:"base_code"`
+        Rates    map[string]float64  `json:"rates"`
+    }
+
+Tag Syntax:
+    `json:"jsonFieldName"`
+    
+- Backticks allow double quotes inside
+- String after colon is the JSON field name
+- Without tag, Go tries to match field name exactly
+
+Common Tag Options:
+    `json:"fieldname"`           // Basic mapping
+    `json:"fieldname,omitempty"` // Omit if empty
+    `json:"-"`                   // Ignore field
+    `json:"fieldname,string"`    // Convert to string
+
+TOPIC 7: STRUCT FOR API RESPONSE
+===============================
+
+Two-struct pattern: one for API, one for app:
+
+API Response Struct (Matches JSON):
+    type APIResponse struct {
+        Result   string              `json:"result"`
+        Provider string              `json:"provider"`
+        BaseCode string              `json:"base_code"`
+        Rates    map[string]float64  `json:"rates"`
+    }
+
+App Data Struct (Application Model):
+    type Rate struct {
+        Currency string
+        Price    float64
+        List     map[string]float64
+    }
+
+Why Two Structs?
+1. API response may have extra fields we don't need
+2. Application needs different structure than API
+3. Decouples API changes from application logic
+4. Cleaner separation of concerns
+
+From code:
+    var apiResponse APIResponse
+    err = json.Unmarshal(bodyBytes, &apiResponse)
+    
+    // Convert API response to app model
+    rate := datatypes.Rate{
+        Currency: currencyUpper,
+        Price: apiResponse.Rates["USD"],
+        List: apiResponse.Rates,
+    }
+
+TOPIC 8: POINTER RETURNS FROM FUNCTIONS
+=======================================
+
+Functions can return pointers to values:
+
+Why Return Pointers?
+- Return nil for errors instead of zero struct
+- Avoid copying large structs
+- Allow caller to modify the value
+
+Pointer Return Type:
+    func GetRate(currency string) (*datatypes.Rate, error) {
+        // ... create rate ...
+        return &rate, nil  // Return pointer with &
+    }
+
+Usage:
+    rate, err := GetRate("inr")
+    if err != nil {
+        panic(err)
+    }
+    
+    // rate is a pointer, but direct access with dot works
+    fmt.Println(rate.Currency)  // Automatically dereferences
+
+Automatic Dereferencing:
+Go automatically dereferences pointers when accessing fields:
+    // These are equivalent:
+    fmt.Println(rate.Currency)   // Go auto-dereferences
+    fmt.Println((*rate).Currency)  // Explicit dereference
+
+From cex.go:
+    func GetRate(currency string) (*datatypes.Rate, error) {
+        // ...
+        rate := datatypes.Rate{...}
+        return &rate, nil  // Return pointer
+    }
+
+From main.go:
+    getRate, err := api.GetRate("inr")
+    fmt.Println(getRate.Price)  // Direct access even though pointer
+
+TOPIC 9: COMPLETE API FLOW
+=========================
+
+Step-by-step API call workflow:
+
+1. Build Dynamic URL:
+    currencyUpper := strings.ToUpper(currency)
+    fullURL := fmt.Sprintf(apiURL, currencyUpper)
+
+2. Make HTTP Request:
+    res, err := http.Get(fullURL)
+    if err != nil {
+        return nil, err  // Network error
+    }
+
+3. Check Status Code:
+    if res.StatusCode == http.StatusOK {
+        // Continue
+    } else {
+        return nil, fmt.Errorf("Status Code: %v", res.StatusCode)
+    }
+
+4. Read Response Body:
+    bodyBytes, err := io.ReadAll(res.Body)
+    if err != nil {
+        return nil, err
+    }
+
+5. Parse JSON:
+    var apiResponse APIResponse
+    err = json.Unmarshal(bodyBytes, &apiResponse)
+    if err != nil {
+        return nil, err
+    }
+
+6. Convert to App Model:
+    rate := datatypes.Rate{
+        Currency: currencyUpper,
+        Price: apiResponse.Rates["USD"],
+        List: apiResponse.Rates,
+    }
+
+7. Return Pointer:
+    return &rate, nil
+
+TOPIC 10: ERROR HANDLING IN API CLIENT
+======================================
+
+Three main error points in API calls:
+
+Network Error:
+    res, err := http.Get(url)
+    if err != nil {
+        // Network failure, wrong URL, etc.
+        return nil, err
+    }
+
+Read Body Error:
+    bodyBytes, err := io.ReadAll(res.Body)
+    if err != nil {
+        // Connection interrupted, etc.
+        return nil, err
+    }
+
+Parse JSON Error:
+    err = json.Unmarshal(bodyBytes, &apiResponse)
+    if err != nil {
+        // Malformed JSON, wrong structure, etc.
+        return nil, err
+    }
+
+Custom Error:
+    if res.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("Status Code: %v", res.StatusCode)
+    }
+
+From main.go Usage:
+    getRate, err := api.GetRate("inr")
+    if err != nil {
+        fmt.Println(err.Error())
+    }
+
+TOPIC 11: MAPS IN GO
+==================
+
+Maps are key-value collections:
+
+Declaration:
+    var m map[string]float64
+    m = make(map[string]float64)
+
+Or Combined:
+    m := make(map[string]float64)
+
+Access:
+    m["USD"] = 1.0
+    value := m["USD"]
+
+From apiResponse.Rates:
+    Rates: map[string]float64  // Maps currency codes to rates
+
+From main.go:
+    fmt.Println(getRate.List["GBP"])  // Access specific rate
+    fmt.Println(getRate.List)         // Print all rates
+
+Empty Map Check:
+    if m == nil {  // Never initialized
+        fmt.Println("nil map")
+    }
+
+TOPIC 12: DATA TYPES FOR CURRENCY VALUES
+========================================
+
+Float Types in Go:
+
+float32:
+- 32-bit floating-point
+- Less precision
+- Smaller memory
+
+float64:
+- 64-bit floating-point
+- More precision
+- Default for JSON unmarshaling
+- Recommended for currency
+
+From datatypes/data.go:
+    type Rate struct {
+        Currency string
+        Price    float64  // Precise for currency
+        List     map[string]float64  // All rates
+    }
+
+Why float64?
+- JSON encoder defaults to float64
+- Better precision for financial data
+- No extra conversion needed
+- Balanced performance/precision
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. http.Get(url) makes GET requests from net/http package
+2. fmt.Sprintf() builds dynamic URLs with string formatting
+3. strings.ToUpper() converts strings to uppercase
+4. io.ReadAll() reads entire HTTP response body as []byte
+5. Check res.StatusCode == http.StatusOK for success
+6. json.Unmarshal() parses JSON into structs
+7. Struct tags (backticks) map JSON fields to struct fields
+8. Use APIResponse struct for API response, Rate struct for app
+9. Return pointers (*Type) to handle nil errors
+10. Go auto-dereferences pointers with dot operator
+11. Maps: map[string]float64 for key-value pairs
+12. Three error points: network, body read, JSON parse
+
+================================================================================

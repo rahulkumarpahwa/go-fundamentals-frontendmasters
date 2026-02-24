@@ -1,0 +1,414 @@
+================================================================================
+SECTION 15: CLOSURES & ANONYMOUS FUNCTIONS WITH GOROUTINES
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section explores closures and anonymous functions (lambda functions) in
+the context of goroutines. It addresses the closure/loop variable problem and
+demonstrates patterns for safe concurrent programming. Key concepts include:
+- Anonymous functions (lambda functions)
+- Closures and captured variables
+- Loop variable reference problems
+- Closure-based WaitGroup handling
+- Shared memory space in goroutines
+
+This pattern is essential for safe concurrent loops in Go.
+
+TOPIC 1: ANONYMOUS FUNCTIONS (LAMBDA FUNCTIONS)
+==============================================
+
+Anonymous functions are functions without names, created on-the-fly.
+
+Syntax:
+    func() {
+        // function body
+    }()
+    
+    // Trailing () executes immediately (IIFE pattern)
+
+From main.go:
+    go func() {
+        GetCurrencyData(currency)
+        wg.Done()
+    }()
+
+Breaking It Down:
+1. func() { ... } - Anonymous function definition
+2. () at end - Immediately execute the function
+3. go prefix - Run in a goroutine
+
+Comparison with Named Functions:
+    // Named function
+    func MyFunction() {
+        // ...
+    }
+    MyFunction()  // Call it
+    
+    // Anonymous function (inline)
+    func() {
+        // ...
+    }()  // Define and execute immediately
+
+When to Use Anonymous Functions:
+- Short, one-off operations
+- Closures over local variables
+- Goroutine bodies (common pattern)
+- Callbacks
+
+TOPIC 2: CLOSURES - CAPTURING VARIABLES
+======================================
+
+A closure is a function that can access variables from its outer scope.
+
+Closure and Outer Variables:
+    currency := "USD"
+    
+    myFunc := func() {
+        fmt.Println(currency)  // Accesses currency from outer scope
+    }
+    
+    myFunc()  // Prints: USD
+
+From main.go:
+    for _, currency := range currencies {
+        go func() {
+            GetCurrencyData(currency)  // Closure: accesses 'currency' from loop
+            wg.Done()
+        }()
+    }
+
+Captured Variable Lifecycle:
+The captured variable lives as long as the closure lives.
+
+Example:
+    func createPrinter(message string) func() {
+        return func() {
+            fmt.Println(message)  // 'message' captured
+        }
+    }
+    
+    printer := createPrinter("Hello")
+    printer()  // "Hello" - variable still accessible!
+
+TOPIC 3: THE LOOP VARIABLE PROBLEM
+=================================
+
+Critical Issue: Loop variables are captured by reference, not value.
+
+The Problem:
+    var wg sync.WaitGroup
+    currencies := []string{"inr", "usd", "eur"}
+    
+    for _, currency := range currencies {
+        wg.Add(1)
+        go func() {
+            fmt.Println(currency)  // PROBLEM!
+            wg.Done()
+        }()
+    }
+    
+    wg.Wait()
+
+Expected Output:
+    inr
+    usd
+    eur
+
+Actual Output (unpredictable):
+    eur
+    eur
+    eur
+
+Why?
+All closures capture the SAME currency variable. By the time goroutines
+execute, the loop has completed and currency contains the last value ("eur").
+
+From qna.txt:
+    "All goroutines will reference the last value of the loop variable, as they
+     share the same memory space and access the variable by reference, not by value."
+
+TOPIC 4: SOLUTION 1 - PASS AS PARAMETER
+======================================
+
+Solution: Pass the loop variable as a function parameter.
+
+When you pass a parameter, Go creates a COPY:
+
+    for _, currency := range currencies {
+        wg.Add(1)
+        go func(curr string) {  // curr is a copy of currency
+            fmt.Println(curr)   // Correct value!
+            wg.Done()
+        }(currency)  // Pass currency as argument
+    }
+
+Why It Works:
+- func(curr string) parameter receives a COPY
+- Each goroutine gets its own copy of the value
+- When function is called (currency), a new copy is created
+- All goroutines see different values
+
+Output: Correct!
+    inr
+    usd
+    eur
+    (in any order)
+
+TOPIC 5: SOLUTION 2 - STORE IN LOCAL VARIABLE
+=============================================
+
+Alternative: Assign to local variable in each iteration:
+
+    for _, currency := range currencies {
+        wg.Add(1)
+        curr := currency  // Create new variable in each iteration
+        go func() {
+            fmt.Println(curr)  // Each closure captures different 'curr'
+            wg.Done()
+        }()
+    }
+
+Why It Works:
+- Each loop iteration creates a NEW local variable 'curr'
+- Each closure captures a DIFFERENT 'curr' variable
+- All values are different
+
+Output: Correct!
+
+TOPIC 6: ANONYMOUS FUNCTION + WAITGROUP PATTERN
+==============================================
+
+The pattern from this section combines closures with WaitGroup:
+
+    var wg sync.WaitGroup
+    
+    for _, item := range items {
+        wg.Add(1)
+        go func() {
+            // Do work with 'item'
+            processItem(item)  // Or pass as parameter: processItem(item)
+            wg.Done()          // Can call here due to closure
+        }()
+    }
+    
+    wg.Wait()
+
+From main.go:
+    for _, currency := range currencies {
+        wg.Add(1)
+        go func() {
+            GetCurrencyData(currency)
+            wg.Done()  // Closure has access to 'wg'
+        }()
+    }
+    
+    wg.Wait()
+
+Advantages:
+1. No need to pass WaitGroup to GetCurrencyData
+2. GetCurrencyData stays simpler (only currency parameter)
+3. Done() called automatically per goroutine
+4. Cleaner delegation pattern
+
+TOPIC 7: COMPARING APPROACHES
+============================
+
+Approach 1: Pass WaitGroup to Function
+
+    func GetCurrencyData(currency string, wg *sync.WaitGroup) {
+        defer wg.Done()
+        // process
+    }
+    
+    go GetCurrencyData(currency, &wg)
+
+Pros:
+- Explicit WaitGroup handling in function
+- Reusable function
+- Clear responsibility
+
+Cons:
+- GetCurrencyData knows about WaitGroup
+- Slightly more code
+
+Approach 2: Closure with WaitGroup (Section 15)
+
+    go func() {
+        GetCurrencyData(currency)
+        wg.Done()
+    }()
+
+Pros:
+- Function stays simple (only business logic)
+- WaitGroup handling at call site
+- Cleaner separation
+
+Cons:
+- Function not reusable with different wait mechanisms
+- Inline code
+
+From main.go Comment:
+    "either pass the waitgroup wg in the method (see last lecture 14 code)
+     or other way is to create the anonymous function which we will make
+     the go routine"
+
+TOPIC 8: SHARED MEMORY ACROSS GOROUTINES
+========================================
+
+Critical Understanding: Goroutines share memory!
+
+From topic.txt:
+    "Every goroutine is actually in the same share space...
+     Goroutines do NOT have their own separate variable space.
+     They all run inside the same shared memory space of the process."
+
+What's Shared:
+- Global variables (package level)
+- Heap memory
+- All data structures in the process
+
+What's NOT Shared:
+- Stack (each goroutine has its own)
+- Local variables (but different goroutines can access same variable)
+
+Example - Race Condition:
+    var counter = 0  // Shared!
+    
+    go func() {
+        counter = counter + 1
+    }()
+    
+    go func() {
+        counter = counter + 1
+    }()
+    
+    // counter might be 1 or 2 (race condition!)
+
+Why?
+Both goroutines access the same counter variable. Without synchronization,
+updates can overlap and be lost.
+
+Solutions:
+1. Use sync.Mutex (locking)
+2. Use sync.Atomic (atomic operations)
+3. Use channels (message passing)
+4. Use WaitGroup (after operations complete)
+
+TOPIC 9: CLOSURE AND WG INTERACTION
+==================================
+
+Why Closure Works with WaitGroup:
+
+The closure captures 'wg' from outer scope:
+
+    var wg sync.WaitGroup
+    
+    go func() {
+        // ... work ...
+        wg.Done()  // 'wg' captured from outer scope!
+    }()
+    
+    wg.Wait()
+
+Captured WaitGroup:
+- func() accesses the same 'wg' variable
+- wg.Done() decrements the SAME counter
+- wg.Wait() sees the Done() call
+- Proper synchronization works!
+
+From main.go:
+    var wg sync.WaitGroup
+    
+    for _, currency := range currencies {
+        wg.Add(1)
+        go func() {
+            GetCurrencyData(currency)
+            wg.Done()  // This 'wg' is from outer scope (captured)
+        }()
+    }
+    
+    wg.Wait()  // Waits for all Done() calls to complete
+
+TOPIC 10: GO VERSION 1.22 LOOP VARIABLE FIX
+===========================================
+
+Go 1.22+ Changed Loop Variable Behavior
+
+Before Go 1.22:
+    for _, v := range items {
+        go func() {
+            use(v)  // WRONG! All see last value
+        }()
+    }
+    // Must copy or pass as parameter
+
+Go 1.22+:
+    for _, v := range items {
+        go func() {
+            use(v)  // CORRECT! Each gets its own 'v'
+        }()
+    }
+    // 'v' is automatically scoped per iteration
+
+From qna.txt:
+    "this problem is till the version 1.22 and solved after that"
+
+Recommendation:
+- For safety with earlier Go versions: always pass as parameter
+- Safer code that works with any version
+- Explicit intent
+
+TOPIC 11: BEST PRACTICES WITH CLOSURES AND GOROUTINES
+==================================================
+
+1. Always Pass Loop Variables:
+    for _, item := range items {
+        go func(it interface{}) {
+            process(it)  // it is a copy
+        }(item)
+    }
+
+2. Use Closure for Local State:
+    go func() {
+        localVar := someValue()
+        processWithLocal(localVar)
+    }()
+
+3. Avoid Shared Mutable State:
+    var result string  // Shared!
+    go func() {
+        result = "value"  // Race condition possible
+    }()
+
+4. Use WaitGroup in Closures:
+    go func() {
+        doWork()
+        wg.Done()  // Clear when to mark completion
+    }()
+
+5. Keep Closures Small:
+    go func() {
+        GetCurrencyData(currency)  // Single responsibility
+        wg.Done()
+    }()
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Anonymous function: func() { ... }() - no name, execute immediately
+2. Closure: function accessing outer scope variables
+3. Loop variable problem: all goroutines see last loop value
+4. Solution: pass loop variable as parameter func(v Type)
+5. Alternative: create new variable in each iteration with :=
+6. Goroutines share memory (same process, same heap)
+7. Must synchronize shared mutable state (use Mutex or WaitGroup)
+8. Closure can capture WaitGroup from outer scope
+9. Go 1.22+ fixes loop variable scoping automatically
+10. For compatibility: always pass loop variables to goroutines
+11. Anonymous function + WaitGroup pattern is idiomatic Go
+12. Keep goroutine bodies small and focused
+
+================================================================================

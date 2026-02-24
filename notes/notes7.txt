@@ -1,0 +1,424 @@
+================================================================================
+SECTION 07: STRUCTS (STRUCTURES)
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section introduces structs in Go, which are composite data types that group
+multiple fields together. Structs are similar to classes in other languages but
+without inheritance. Key concepts include:
+- Struct definition and instantiation
+- Field access and modification
+- Exported vs unexported fields
+- Methods on structs
+- Struct composition
+
+Structs are fundamental to Go's approach to object-oriented programming.
+
+TOPIC 1: WHAT ARE STRUCTS?
+=======================
+
+A struct is a composite data type that groups related fields together.
+
+Think of Structs As:
+- Classes without methods (initially)
+- Collections of strongly-typed properties
+- Named tuples with field names
+- Data containers with structure
+
+From instructor.go:
+    type Instructor struct {
+        Id        int
+        FirstName string
+        LastName  string
+        Score     int
+    }
+
+This Defines:
+- Type name: Instructor
+- Four fields with explicit types
+- All fields are strongly typed
+- No methods yet (can be added separately)
+
+TOPIC 2: STRUCT FIELD NAMING & VISIBILITY
+=========================================
+
+Field visibility in Go is determined by first letter capitalization.
+
+EXPORTED FIELDS (Public):
+    type Instructor struct {
+        Id        int      // Starts with capital - EXPORTED
+        FirstName string   // Starts with capital - EXPORTED
+        LastName  string   // Starts with capital - EXPORTED
+        Score     int      // Starts with capital - EXPORTED
+    }
+
+Exported fields:
+- Visible from outside the package
+- Can be accessed and modified by external code
+- Required for structs exposed in package API
+
+UNEXPORTED FIELDS (Private):
+    type User struct {
+        name     string  // Starts with lowercase - NOT EXPORTED
+        password string  // Starts with lowercase - NOT EXPORTED
+        active   bool    // Starts with lowercase - NOT EXPORTED
+    }
+
+Unexported fields:
+- Only accessible within the same package
+- Not visible to external packages
+- Good for internal state
+
+Package Visibility Rule:
+ALL fields in an exported struct MUST start with capital letters.
+
+From instructor.go Comment:
+    "note when we have export to another package every value inside the struct
+     we need to write in capital first letter."
+
+Why: If a struct is exported (Instructor), Go must be able to export all its
+fields. Mixed-case structs would be inconsistent.
+
+TOPIC 3: CREATING AND INITIALIZING STRUCTS
+==========================================
+
+There are two main ways to create structs:
+
+METHOD 1: Zero-Value Initialization
+    max := data.Instructor{}
+    max.FirstName = "Maximiliano"
+    max.LastName = "Firtman"
+
+Process:
+1. Create empty struct with all zero values
+2. Set field values individually using dot notation
+3. Unset fields remain at zero values
+
+Result:
+    Instructor{
+        Id: 0,         // Default for int
+        FirstName: "Maximiliano",
+        LastName: "Firtman",
+        Score: 0,      // Default for int
+    }
+
+From main.go:
+    max := data.Instructor{}  // Empty struct
+    max.FirstName = "Maximiliano"  // Set field by field
+
+METHOD 2: Field-Based Initialization
+    rahul := data.Instructor{Id: 89, FirstName: "rahul"}
+
+Process:
+1. Provide named fields and values
+2. Omitted fields use zero values
+3. More concise than sequential assignment
+
+Result:
+    Instructor{
+        Id: 89,
+        FirstName: "rahul",
+        LastName: "",      // Default for string
+        Score: 0,          // Default for int
+    }
+
+From main.go:
+    rahul := data.Instructor{Id: 89, FirstName: "rahul"}
+
+Advantages:
+- Explicit about which fields are set
+- More readable for many fields
+- Can omit non-essential fields
+
+ZERO VALUES BY TYPE:
+When a field isn't explicitly initialized:
+- int: 0
+- string: "" (empty string)
+- bool: false
+- float: 0.0
+- struct: struct with all fields at zero values
+- slice: nil empty slice
+- map: nil empty map
+- pointer: nil
+
+TOPIC 4: FIELD ACCESS & MODIFICATION
+===================================
+
+Access struct fields using dot notation:
+
+Reading a Field:
+    fmt.Println(max.FirstName)  // Output: Maximiliano
+
+Modifying a Field:
+    max.Score = 95
+    max.LastName = "Smith"
+
+Accessing Nested Fields:
+If a struct contains another struct:
+    type Course struct {
+        Instructor Instructor
+    }
+    
+    course := Course{}
+    course.Instructor.FirstName = "Max"  // Nested access
+
+From main.go:
+    max := data.Instructor{}
+    max.FirstName = "Maximiliano"  // Using dot notation to assign
+
+TOPIC 5: METHODS ON STRUCTS
+==========================
+
+Methods are functions attached to a struct type.
+
+Syntax:
+    func (receiver StructType) MethodName() ReturnType {
+        return value
+    }
+
+From methods.go:
+    func (i Instructor) PrintInstructor() string {
+        return fmt.Sprintf("Name : %v %v\nId : %v", i.FirstName, i.LastName, i.Id)
+    }
+
+Breaking It Down:
+- (i Instructor) - Receiver: i is the Instructor instance
+- PrintInstructor() - Method name
+- string - Return type
+- Inside: access fields using receiver variable (i.FirstName, etc.)
+
+Calling Methods:
+    maksInstruct := data.Instructor{FirstName: "Max", LastName: "Firtman"}
+    result := maksInstruct.PrintInstructor()
+    fmt.Println(result)
+    
+    // Output:
+    // Name : Max Firtman
+    // Id : 0
+
+Two Ways to Call:
+    // Way 1: Direct (preferred)
+    result := maksInstruct.PrintInstructor()
+    
+    // Way 2: Full function style
+    result := data.Instructor.PrintInstructor(maksInstruct)
+
+From main.go - Both Used:
+    // Direct method call
+    fmt.Println(max.PrintInstructor())
+    
+    // Full function-style call
+    fmt.Println(data.Instructor.PrintInstructor(rahul))
+
+TOPIC 6: METHOD NAMING CONVENTIONS
+=================================
+
+Method names must start with CAPITAL letters to be exported.
+
+EXPORTED METHODS (Public):
+    func (i Instructor) PrintInstructor() string { ... }
+    // Starts with capital P - can be called from other packages
+
+UNEXPORTED METHODS (Private):
+    func (i Instructor) validate() error { ... }
+    // Starts with lowercase v - only accessible in same package
+
+From methods.go:
+    func (i Instructor) PrintInstructor() string {
+        // Capital P = Exported, can be accessed from main.go (different package)
+    }
+
+This allows external code to call:
+    rahul.PrintInstructor()  // Works from main.go in another package
+
+TOPIC 7: STRUCT PRINTING & STRING REPRESENTATION
+===============================================
+
+Structs have default string representations when printed:
+
+Using fmt.Println():
+    fmt.Println(max)
+    
+    // Output: {89 maximiliano firtman 0}
+    // Or similar format showing all field values
+
+Better Approach - Using Method:
+    func (i Instructor) PrintInstructor() string {
+        return fmt.Sprintf("Name : %v %v\nId : %v", 
+                          i.FirstName, i.LastName, i.Id)
+    }
+    
+    fmt.Println(max.PrintInstructor())
+    // Output:
+    // Name : maximiliano firtman
+    // Id : 89
+
+From main.go:
+    fmt.Println(max)  // Default representation
+    fmt.Println(rahul)  // Default representation
+
+Benefits of Custom Method:
+- Human-readable output
+- Controlled format
+- Only shows relevant fields
+- Follows naming conventions
+
+TOPIC 8: PACKAGE ORGANIZATION
+===========================
+
+Structs and their methods can be split across files in same package.
+
+File Structure:
+    data/
+        instructor.go  - Struct definition
+        methods.go     - Struct methods
+
+From instructor.go:
+    type Instructor struct { ... }
+    // Struct definition
+
+From methods.go:
+    func (i Instructor) PrintInstructor() string { ... }
+    // Method using same package's struct
+
+From comments:
+    "Files in the same package can access each other's types and methods,
+     regardless of which file they are in. The package is the key
+     organizational unit, not individual files."
+
+Key Points:
+- Same package = all files merged by compiler
+- Can split structs and methods across files
+- All must be in same folder
+- Package name must be identical
+
+TOPIC 9: EXPORTING STRUCTS ACROSS PACKAGES
+==========================================
+
+To use a struct from another package:
+
+1. Define struct with capital letter (exported):
+    // data/instructor.go
+    type Instructor struct {
+        FirstName string
+        LastName  string
+    }
+
+2. Import the package:
+    // main.go
+    import "mod7/data"
+
+3. Create instance:
+    max := data.Instructor{}
+
+From main.go:
+    import (
+        "fmt"
+        "mod7/data"
+    )
+    
+    max := data.Instructor{}
+
+The Package Path:
+- mod7 - Project module name
+- data - SubPackage name
+- Instructor - Exported struct name
+
+TOPIC 10: COMPARISON WITH CLASSES
+================================
+
+Go Structs vs Classes in Other Languages:
+
+Go Structs:
+    type Person struct {
+        Name string
+        Age  int
+    }
+    
+    func (p Person) Greet() string {
+        return fmt.Sprintf("Hi, %s", p.Name)
+    }
+
+JavaScript Classes:
+    class Person {
+        constructor(name, age) {
+            this.name = name;
+            this.age = age;
+        }
+        
+        greet() {
+            return `Hi, ${this.name}`;
+        }
+    }
+
+Similarities:
+- Group data with behavior
+- Methods defined on type
+- Access fields within methods
+
+Differences:
+- Go separates data structure from methods
+- No inheritance (has embedding as alternative)
+- No constructors or destructors
+- Methods are explicitly attached with receiver syntax
+
+TOPIC 11: WHEN TO USE STRUCTS
+============================
+
+Create a Struct When:
+1. Grouping related fields:
+    type User struct {
+        Name  string
+        Email string
+        Age   int
+    }
+
+2. Creating API data types:
+    type Response struct {
+        Status  string
+        Data    interface{}
+        Error   string
+    }
+
+3. Object-like behavior:
+    type Rectangle struct {
+        Width  float64
+        Height float64
+    }
+    
+    func (r Rectangle) Area() float64 {
+        return r.Width * r.Height
+    }
+
+4. Database models:
+    type Product struct {
+        ID    int
+        Name  string
+        Price float64
+    }
+
+Don't Use Structs For:
+- Single value grouping (use plain type or variable)
+- Short-lived temporary data (use map)
+- Large collections (use slice instead)
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. Struct groups related fields of different types
+2. All exported struct fields must start with CAPITAL letters
+3. Create structs: zero-value {...} OR field-based {Id: 1, Name: "..."}
+4. Access fields with dot notation: instance.Field
+5. Methods are functions attached to types using receiver syntax
+6. Exported methods start with capital letter
+7. Can define struct and methods in different files of same package
+8. Structs are Go's approach to object-oriented programming
+9. No inheritance in Go - use embedding instead (next section)
+10. Default string representation shows all field values
+11. Custom method can provide better formatted output
+12. Unset fields use zero values (0, "", false, etc.)
+
+================================================================================

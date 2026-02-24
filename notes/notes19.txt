@@ -1,0 +1,796 @@
+================================================================================
+S19: SERVING FILES - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section introduces file serving, allowing your web server to deliver static
+assets (HTML, CSS, JavaScript, images) from a folder. We learn about http.FileServer,
+distinguishing between Handle and HandleFunc, understanding the http.Handler
+interface, and discussing client-side vs. server-side rendering strategies.
+
+Key Topics Covered:
+- http.FileServer: Automatic file serving
+- http.Dir: Specifying root directory
+- Handle vs. HandleFunc: Two ways to register routes
+- http.Handler interface
+- ServeHTTP method
+- Static file serving patterns
+- Security: Protecting file system access
+- Client-side rendering vs. server-side rendering
+- Performance considerations
+
+================================================================================
+1. HTTP.FILESERVER: AUTOMATIC FILE SERVING
+================================================================================
+
+http.FileServer is a utility function that creates a handler capable of serving
+all files from a specified directory. Instead of manually reading URLs, checking
+file systems, and responding with file contents, FileServer handles this
+automatically.
+
+Signature:
+    func FileServer(root FileSystem) Handler
+
+Parameters:
+- root FileSystem: The root directory to serve files from
+- Returns: An http.Handler (type, not function)
+
+Basic Usage:
+    fs := http.FileServer(http.Dir("./public"))
+
+From main.go (lines 14-15):
+    fs := http.FileServer(http.Dir("./public"))
+    // this will serve all the files in public folder. pass here the relative path.
+
+What FileServer Does:
+1. Looks at incoming HTTP requests
+2. Uses the request URL path as a file path
+3. Looks in the specified directory for that file
+4. If found, serves the file
+5. If not found, returns 404
+6. Sets correct Content-Type headers based on file extension
+
+This is similar to the Live Server extension in VS Code, which automatically
+serves files from a folder.
+
+Purpose:
+- Common pattern: Web servers serve static folders (like "public")
+- No need to write manual file-reading code
+- Handles MIME types, caching, and HTTP semantics automatically
+- Security: Only serves from specified directory (can't access parent folders)
+
+Example Directory Structure:
+    project/
+    ├── main.go
+    ├── public/
+    │   ├── index.html
+    │   ├── styles.css
+    │   ├── script.js
+    │   └── images/
+    │       ├── logo.png
+    │       └── background.jpg
+    └── auth/
+        └── auth.go
+
+With fs := http.FileServer(http.Dir("./public")):
+    Request to /index.html    → Serves ./public/index.html
+    Request to /styles.css    → Serves ./public/styles.css
+    Request to /images/logo.png → Serves ./public/images/logo.png
+    Request to /unknown.html  → 404 Not Found
+
+
+================================================================================
+2. HTTP.DIR: SPECIFYING THE PROTECTED ROOT DIRECTORY
+================================================================================
+
+http.Dir wraps a file path and creates a secure file system interface. It's
+crucial for preventing users from accessing the entire file system.
+
+Syntax:
+    http.Dir("relative/path")
+
+From main.go (line 15):
+    fs := http.FileServer(http.Dir("./public"))
+
+Purpose of http.Dir:
+- Specifies the root directory for file serving
+- Prevents access to parent directories
+- Creates a restricted file system view
+- Only files under ./public are accessible
+
+Security Example:
+With http.Dir("./public"):
+    localhost/index.html    ✓ Allowed (./public/index.html exists)
+    localhost/../main.go    ✗ Forbidden (trying to access parent)
+    localhost/../../etc/password ✗ Forbidden (prevents filesystem escape)
+
+If you used http.Dir("./") instead:
+    localhost/../main.go    ✓ Allowed (bad - exposes source code!)
+    localhost/../../private ✓ Allowed (bad - exposes system files!)
+
+Best Practices:
+1. Always use a specific, narrow directory: ("./public"), ("./static"), ("./assets")
+2. Never use root directory: ("./") - exposes entire project
+3. Put only intended public files in the directory
+4. Consider what users should be able to download
+
+Relative vs. Absolute Paths:
+    http.Dir("./public")           // Relative path (recommended)
+    http.Dir("/home/user/public")  // Absolute path (works, less portable)
+    http.Dir("public")             // Without ./ (also works)
+
+From main.go (lines 26-28):
+    // Be careful the folder you pick for that. We don't want user to get access
+    // to our whole file system. So for that, we create that object, it's
+    // http.FileServer, and we need to specify the root.
+
+
+================================================================================
+3. HANDLE VS. HANDLEFUNC: TWO WAYS TO REGISTER ROUTES
+================================================================================
+
+Go provides two methods to register routes, and understanding when to use each is
+crucial. HandleFunc expects a function, while Handle expects a type.
+
+HandleFunc: Function-Based Registration
+    Signature: HandleFunc(pattern string, handler func(ResponseWriter, *Request))
+    
+    Example:
+        server.HandleFunc("/auth", auth.HandleAuth)
+    
+    When to use:
+    - Simple handlers with functions
+    - Handler function has the exact signature
+    - Most common pattern for custom handlers
+
+From main.go (line 12):
+    server.HandleFunc("/auth", auth.HandleAuth)
+
+Handle: Type-Based Registration
+    Signature: Handle(pattern string, handler Handler)
+    
+    Example:
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+    
+    When to use:
+    - Handler is a type (struct), not a function
+    - Type implements the http.Handler interface
+    - FileServer returns a type, not a function
+
+From main.go (lines 14-15, 17):
+    fs := http.FileServer(http.Dir("./public"))
+    // this will serve all the files in public folder
+    
+    server.Handle("/", fs)
+
+Key Difference:
+    HandleFunc → Pass: auth.HandleAuth (a function)
+    Handle     → Pass: fs (a type/struct with ServeHTTP method)
+
+Both are equally valid. Choose based on what you're registering:
+- Have a matching function? Use HandleFunc
+- Have a type implementing http.Handler? Use Handle
+
+
+================================================================================
+4. THE HTTP.HANDLER INTERFACE
+================================================================================
+
+http.Handler is an interface that defines what types can act as handlers. To be
+an http.Handler, a type must implement the ServeHTTP method.
+
+Interface Definition:
+    type Handler interface {
+        ServeHTTP(w ResponseWriter, r *Request)
+    }
+
+What This Means:
+- Any type with a ServeHTTP method is automatically an http.Handler
+- The method signature must match exactly
+- Go uses implicit interface implementation (no explicit "implements" keyword)
+
+From ChatGPT explanation in main.go:
+    "type Handler interface {
+        ServeHTTP(ResponseWriter, *Request)
+    }
+    
+    So any type that has:
+    ServeHTTP(w http.ResponseWriter, r *http.Request)
+    automatically satisfies the http.Handler interface."
+
+Example: Why FileServer Returns a Type:
+    fs := http.FileServer(http.Dir("./public"))
+    
+    FileServer returns a type that internally looks like:
+        type fileHandler struct {
+            root http.Dir
+        }
+        
+        func (fh fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+            // Logic to serve files
+        }
+    
+    Because fileHandler has ServeHTTP, it's an http.Handler
+    So it can be registered with Handle()
+
+Custom Handler Example:
+    type MyHandler struct {
+        Name string
+    }
+    
+    func (mh MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte("Handler: " + mh.Name))
+    }
+    
+    // Can be registered with Handle (not HandleFunc)
+    server.Handle("/custom", MyHandler{Name: "Test"})
+
+Implicit Implementation:
+- No explicit "implements Handler" declaration needed
+- If type has ServeHTTP method with correct signature, it's a Handler
+- Go's duck-typing philosophy: "If it walks like a duck..."
+
+
+================================================================================
+5. SERVHTTP METHOD: THE CORE OF HANDLERS
+================================================================================
+
+ServeHTTP is the method that all http.Handlers must implement. When a request
+arrives, the multiplexer calls ServeHTTP on the registered handler.
+
+Method Signature:
+    func (receiver Type) ServeHTTP(w http.ResponseWriter, r *http.Request)
+
+Execution Flow:
+    1. Client makes HTTP request
+    2. Multiplexer matches URL to pattern
+    3. Multiplexer finds registered handler for pattern
+    4. If registered with HandleFunc: Calls the function directly
+    5. If registered with Handle: Calls handler.ServeHTTP()
+    6. Handler processes request and writes response
+
+For HandleFunc:
+    server.HandleFunc("/auth", auth.HandleAuth)
+    
+    When request arrives:
+    → auth.HandleAuth(w, r) is called directly
+
+For Handle with FileServer:
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+    
+    When request arrives:
+    → fs.ServeHTTP(w, r) is called
+    → FileServer's internal ServeHTTP finds and serves the file
+
+Why This Design:
+- FileServer is a complex type with internal state (root directory)
+- Can't be represented as a simple function
+- ServeHTTP method allows types to act as handlers
+- Provides flexibility: Functions and types both work
+
+
+================================================================================
+6. STATIC FILE SERVING PATTERNS
+================================================================================
+
+Common patterns for serving static files in web applications.
+
+Basic Static Serving:
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+
+This serves:
+    /index.html       → ./public/index.html
+    /styles.css       → ./public/styles.css
+    /images/logo.png  → ./public/images/logo.png
+
+Mixed Routes (Static + Dynamic):
+    // Dynamic routes
+    server.HandleFunc("/auth", auth.HandleAuth)
+    server.HandleFunc("/api/data", apiDataHandler)
+    
+    // Static files (catch-all at root)
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+
+From main.go (lines 12, 14-17):
+    server.HandleFunc("/auth", auth.HandleAuth)
+    
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+
+Serving Specific Subpath:
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/static/", fs)
+    
+    This serves:
+        /static/styles.css → ./public/styles.css
+        /static/images/x.png → ./public/images/x.png
+
+Multiple Static Paths:
+    staticCSS := http.FileServer(http.Dir("./css"))
+    staticJS := http.FileServer(http.Dir("./js"))
+    staticImg := http.FileServer(http.Dir("./images"))
+    
+    server.Handle("/css/", staticCSS)
+    server.Handle("/js/", staticJS)
+    server.Handle("/images/", staticImg)
+
+From main.go (lines 34-36):
+    // Can we call more than one time handler HandleFunc?
+    // Yes, as many as you want. And actually, the system will look to the pattern
+    // (route path pattern) and will pick the first one that matches
+
+Route Matching:
+- More specific patterns should be registered before general patterns
+- FileServer at "/" catches all unmatched URLs
+- Place specific routes (like /auth) before catch-all root "/"
+
+
+================================================================================
+7. SECURITY CONSIDERATIONS: PROTECTING FILE SYSTEM ACCESS
+================================================================================
+
+File serving is a potential security vulnerability. Poor implementation can
+expose sensitive files to users.
+
+Bad Practice:
+    fs := http.FileServer(http.Dir("./"))
+    server.Handle("/", fs)
+    
+    Problems:
+    - Users can access main.go (source code exposure)
+    - Users can access auth/auth.go (internal logic exposure)
+    - Users can access go.mod (dependency information)
+    - Users can access private configuration files
+    - Potential path traversal attacks
+
+Good Practice:
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+    
+    Benefits:
+    - Only files in public/ are accessible
+    - Source code remains protected
+    - Configuration files remain private
+    - Clear separation of public vs. private
+
+From main.go (lines 26-28):
+    // Be careful the folder you pick for that. We don't want user to get access
+    // to our whole file system. So for that, we create that object, it's
+    // http.FileServer, and we need to specify the root.
+
+File Organization Principle:
+    project/
+    ├── main.go              ← NOT in public/
+    ├── auth/
+    │   └── auth.go          ← NOT in public/
+    ├── go.mod, go.sum       ← NOT in public/
+    ├── .env, config.json    ← NOT in public/
+    └── public/              ← ONLY this served
+        ├── index.html       ← Public
+        ├── styles.css       ← Public
+        ├── script.js        ← Public
+        └── images/          ← Public
+
+Best Practices:
+1. Never serve from root directory
+2. Create explicit "public" folder for web-accessible files
+3. Keep all private files outside the served directory
+4. Review file list to ensure nothing sensitive is visible
+5. Use .gitignore to prevent private files from version control
+
+
+================================================================================
+8. CLIENT-SIDE RENDERING: JAVASCRIPT-DRIVEN HTML
+================================================================================
+
+In client-side rendering, HTML structure is sent to browser, then JavaScript
+downloads additional data and generates content dynamically.
+
+Workflow:
+    1. Browser requests index.html
+    2. Server sends HTML (with JavaScript)
+    3. Browser parses HTML and loads JavaScript
+    4. JavaScript executes and requests JSON data (/api/articles)
+    5. JavaScript receives JSON
+    6. JavaScript parses JSON and injects HTML into DOM
+    7. User sees rendered content
+
+From main.go (lines 48-53):
+    // Now, if you look at the page source in the HTML in public folder, you only
+    // have one article (an H2, a paragraph and an image) in the HTML.
+    // The rest of the articles are actually coming from JavaScript.
+    // So it's a client-side render solution.
+    // 
+    // JavaScript is downloading a JSON, and it's parsing the JSON and is
+    // injecting HTML on the fly.
+
+Example HTML Structure:
+    <!-- public/index.html -->
+    <html>
+    <head>
+        <title>My Site</title>
+        <script src="script.js"></script>
+    </head>
+    <body>
+        <h1>Articles</h1>
+        <div id="articles"></div>
+        <!-- JavaScript will populate this -->
+    </body>
+    </html>
+
+Example JavaScript:
+    // public/script.js
+    fetch('/api/articles')
+        .then(response => response.json())
+        .then(data => {
+            data.articles.forEach(article => {
+                const html = `<article>
+                    <h2>${article.title}</h2>
+                    <p>${article.content}</p>
+                </article>`;
+                document.getElementById('articles').innerHTML += html;
+            });
+        });
+
+Performance Issue:
+From main.go (lines 54-57):
+    // But that's not so performant, because we need the user has to wait for
+    // JavaScript to load to then go and grab a JSON And then when we have the
+    // JSON, it needs to generate that HTML dynamically.
+
+Timeline Problem:
+    0ms:   User requests page
+    100ms: HTML loaded (but no content yet)
+    150ms: JavaScript loaded
+    200ms: JavaScript makes request for JSON
+    300ms: JSON received
+    350ms: JavaScript renders content
+    
+    User sees blank page from 100-350ms!
+
+From qna.txt:
+    "What is the problem with client-side rendering for loading articles?
+     It is not performant because the user must wait for JavaScript to load,
+     then download JSON, and then dynamically generate HTML"
+
+
+================================================================================
+9. SERVER-SIDE RENDERING: HTML-DRIVEN CONTENT
+================================================================================
+
+Server-side rendering sends complete HTML from the server, with content already
+injected. Browser receives finished HTML, no JavaScript processing needed.
+
+Workflow:
+    1. Browser requests /
+    2. Server retrieves articles from database
+    3. Server generates HTML with articles injected
+    4. Server sends complete HTML to browser
+    5. Browser displays immediately (no JavaScript needed)
+
+Example Process:
+    <!-- public/index.html (template) -->
+    <html>
+    <body>
+        <h1>Articles</h1>
+        <div id="articles">
+            {{ARTICLES_GO_HERE}}
+        </div>
+    </body>
+    </html>
+
+    // Server generates:
+    <html>
+    <body>
+        <h1>Articles</h1>
+        <div id="articles">
+            <article><h2>Article 1</h2><p>Content 1</p></article>
+            <article><h2>Article 2</h2><p>Content 2</p></article>
+            <article><h2>Article 3</h2><p>Content 3</p></article>
+        </div>
+    </body>
+    </html>
+
+From main.go (lines 58-67):
+    // But now, we are setting that this is bad for performance, so we can do
+    // server-side rendering. That is, maybe we can actually inject in the HTML
+    // all the articles directly from a static collection that you have somewhere.
+    // It can be a database, a JSON, whatever. Makes sense?
+    // So I want to create all these articles server-side, so the browser will
+    // receive just HTML. We can even get rid of JavaScript at all. So we can get
+    // rid of the script.js and see the same thing on the screen.
+
+Timeline with Server-Side Rendering:
+    0ms:   User requests page
+    100ms: Server processes, fetches data, generates HTML
+    150ms: Complete HTML sent to browser
+    200ms: Browser displays content
+    
+    User sees content faster (150ms vs 350ms)!
+
+Performance Benefit:
+- Smaller initial payload (no JavaScript framework)
+- Fewer HTTP requests (data combined with HTML)
+- Faster time to first content paint
+- Better for SEO (search engines see actual HTML)
+- Works without JavaScript (progressive enhancement)
+
+Go's Advantages:
+- Can render HTML server-side easily (Go templates covered in s20)
+- Combines data + HTML in single response
+- No need for separate API endpoints
+- No JavaScript overhead on client
+
+
+================================================================================
+10. ELIMINATING JAVASCRIPT FOR STATIC CONTENT
+================================================================================
+
+If content is served via server-side rendering, JavaScript may not be needed.
+
+Before (Client-Side Rendering):
+    Dependencies:
+    - HTML file
+    - JavaScript file (to fetch and render)
+    - JSON API (data endpoint)
+    
+    Files Required: 3+
+    Network Requests: 3+ (HTML, JS, JSON)
+    Processing: Browser + JavaScript
+
+After (Server-Side Rendering):
+    Dependencies:
+    - HTML file (contains all content)
+    
+    Files Required: 1
+    Network Requests: 1 (just HTML)
+    Processing: Server handles rendering
+
+From main.go (lines 65-67):
+    // We can even get rid of JavaScript at all.
+    // So we can get rid of the script.js and see the same thing on the screen.
+
+When JavaScript is Needed:
+- Interactivity (form validation, dynamic behavior)
+- Real-time updates (live notifications)
+- Client-side filtering/sorting
+- Complex UI interactions
+- Single-page applications
+
+When JavaScript is Not Needed:
+- Static content (blog posts, articles)
+- Simple form submission
+- Read-only displays
+- SEO-critical content
+- Performance-critical pages
+
+Go Templates (s20):
+The next section (s20_goTemplates) covers Go's templating engine, which makes
+server-side rendering easy:
+    - Define HTML template with placeholders
+    - Pass data to template
+    - Templates render to complete HTML
+    - Send HTML to browser
+
+
+================================================================================
+11. MIXING STATIC FILES WITH DYNAMIC HANDLERS
+================================================================================
+
+Real applications mix static files with dynamic route handlers.
+
+Complete Example:
+    server := http.NewServeMux()
+    
+    // Dynamic handlers
+    server.HandleFunc("/auth", auth.HandleAuth)
+    server.HandleFunc("/api/articles", articlesAPIHandler)
+    server.HandleFunc("/api/user", userAPIHandler)
+    
+    // Static files (catch-all, must be last)
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+
+From main.go (lines 10-17):
+    server := http.NewServeMux()
+    server.HandleFunc("/auth", auth.HandleAuth)
+    
+    fs := http.FileServer(http.Dir("./public"))
+    server.Handle("/", fs)
+
+Routing Order:
+1. Request for /auth
+   → Matches /auth route → auth.HandleAuth called
+
+2. Request for /api/articles
+   → Matches /api/articles route → Handler called
+
+3. Request for /styles.css
+   → Doesn't match specific routes → "/" catches it → FileServer serves file
+
+4. Request for /nonexistent
+   → Doesn't match specific routes → "/" catches it → FileServer returns 404
+
+Organization Pattern:
+    project/
+    ├── handlers.go          (general handlers)
+    ├── auth/
+    │   └── auth.go          (auth routes)
+    ├── api/
+    │   └── api.go           (API routes)
+    └── public/
+        ├── index.html
+        ├── styles.css
+        └── script.js
+
+This structure scales well as applications grow.
+
+
+================================================================================
+12. COMPLETE FILE SERVING IMPLEMENTATION
+================================================================================
+
+Summary of complete file serving setup.
+
+Full Implementation:
+    package main
+    
+    import (
+        "fmt"
+        "mod19/auth"
+        "net/http"
+    )
+    
+    func main() {
+        server := http.NewServeMux()
+        
+        // Dynamic route
+        server.HandleFunc("/auth", auth.HandleAuth)
+        
+        // Static file server
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+        
+        // Start server
+        err := http.ListenAndServe(":1999", server)
+        if err != nil {
+            fmt.Println("Error : ", err.Error())
+        }
+    }
+
+From main.go (lines 9-23):
+    func main() {
+        server := http.NewServeMux()
+        server.HandleFunc("/auth", auth.HandleAuth)
+        
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+        
+        err := http.ListenAndServe(":1999", server)
+        if err != nil {
+            fmt.Println("Error : ", err.Error())
+        }
+    }
+
+Testing:
+1. Start server: go run main.go
+2. Browser: http://localhost:1999/
+   → Serves ./public/index.html
+3. Browser: http://localhost:1999/styles.css
+   → Serves ./public/styles.css
+4. Browser: http://localhost:1999/auth
+   → Calls auth.HandleAuth handler
+5. Browser: http://localhost:1999/nonexistent
+   → FileServer returns 404 Not Found
+
+Directory Structure:
+    s19_servingFiles/
+    ├── main.go              (server setup)
+    ├── go.mod
+    ├── auth/
+    │   └── auth.go          (auth handler)
+    └── public/              (static files)
+        ├── index.html
+        ├── styles.css
+        ├── script.js
+        ├── background.css
+        └── images/
+
+This is a complete, working web server that serves static files and handles
+dynamic routes.
+
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. FileServer Automation:
+   - http.FileServer handles all file serving logic
+   - Don't manually read files or check file system
+   - Returns http.Handler type (not function)
+   - Automatically sets MIME types and caching
+
+2. http.Dir Protection:
+   - Always specify narrow directory: ("./public")
+   - Never serve from root or parent directories
+   - Prevents users accessing source code
+   - Critical security measure
+
+3. Handle vs. HandleFunc:
+   - HandleFunc: For functions (most custom handlers)
+   - Handle: For types implementing http.Handler
+   - FileServer requires Handle (returns type, not function)
+   - Both are valid, choose based on what you're registering
+
+4. http.Handler Interface:
+   - Any type with ServeHTTP method is a handler
+   - ServeHTTP signature: func(ResponseWriter, *Request)
+   - Go uses implicit interface implementation
+   - FileServer is a type implementing Handler
+
+5. Client-Side Rendering:
+   - Browser gets HTML, then JavaScript renders content
+   - Performance cost: Wait for JS, then fetch data, then render
+   - Creates blank page delay for users
+   - More complex (multiple files and requests)
+
+6. Server-Side Rendering:
+   - Server generates complete HTML before sending
+   - Browser receives finished content
+   - Faster user experience (fewer requests)
+   - No JavaScript needed for static content
+   - Better for performance and SEO
+
+7. Mixing Routes:
+   - Specific routes first (HandleFunc)
+   - Catch-all static server last (Handle with FileServer)
+   - Both can coexist in same application
+   - Allows API + static files in one server
+
+8. Security:
+   - Expose only intended files
+   - Structure: Keep public files in public/, rest private
+   - Review what's visible to users
+   - Always use http.Dir with specific path
+
+9. Go Advantages:
+   - Standard library provides everything needed
+   - No framework required for basic web serving
+   - Server-side rendering built in (see s20 templates)
+   - Performance-friendly approach
+
+10. Next Steps:
+    - Server-side rendering in detail (s20: Go Templates)
+    - Template generation with data injection
+    - Dynamic HTML generation on server
+    - Combining templates with file serving
+
+================================================================================
+SECTION SUMMARY: S17-S19 HTTP SERVER FOUNDATION
+================================================================================
+
+S17 (Building Basic Server):
+- ListenAndServe starts server
+- HandleFunc registers routes
+- ResponseWriter to send responses
+- Default multiplexer handles routing
+
+S18 (Server Organization):
+- NewServeMux creates explicit server instances
+- Organization via separate packages
+- Functions as handlers
+- Development workflow and reloading
+
+S19 (Serving Files):
+- FileServer handles static file serving
+- Handle vs. HandleFunc for registration
+- http.Handler interface
+- Client-side vs. server-side rendering
+
+Together: Complete foundation for building web servers in Go
+Next: S20_goTemplates - Server-side rendering with templates
+================================================================================

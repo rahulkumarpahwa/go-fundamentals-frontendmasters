@@ -1,0 +1,300 @@
+================================================================================
+SECTION 03: PROJECT - CALCULATOR
+================================================================================
+
+PROJECT OVERVIEW:
+=================
+
+This section demonstrates a simple interactive calculator program that:
+- Takes user input for an operation and two numbers
+- Performs arithmetic operations based on user input
+- Displays the result
+
+This is a practical application of concepts learned in previous sections:
+- Variable declarations
+- Input/output operations
+- Switch-case statements
+- Pointer usage for input functions
+
+TOPIC 1: PROJECT STRUCTURE
+==========================
+
+The calculator is a single main.go program with no external packages.
+
+Key Components:
+1. Variable declarations for input
+2. User input prompts
+3. Input scanning (reading user input)
+4. Switch statement for operation selection
+5. Output of results
+
+TOPIC 2: USER INPUT OPERATIONS
+==============================
+
+Go provides two main functions for reading user input from terminal:
+
+1. fmt.Scan(&variable) - Reads values separated by whitespace
+   Syntax: fmt.Scan(&variableName)
+   Example from calculator:
+       fmt.Println("Which Operation do you want? (add, subtract, multiply, divide)")
+       fmt.Scan(&operation)  // Reads a string from user
+       
+       fmt.Println("Enter the second Number")
+       fmt.Scan(&num2)  // Reads an integer from user
+
+   - Stops at whitespace
+   - Returns when user presses Enter
+   - Requires pointer arguments (&variable) to modify the original
+
+2. fmt.Scanf(format, &variable) - Formatted input reading
+   Syntax: fmt.Scanf("%format", &variableName)
+   Example:
+       fmt.Scanf("%d", &num1)  // Reads an integer with %d format
+       fmt.Scanf("%s", &operation)  // Reads a string with %s format
+
+   - Uses format specifiers like scanf in C
+   - More control over input parsing
+   - Still requires pointers
+
+WHY POINTERS ARE NEEDED:
+The input functions need to modify the variables, so they require pointers:
+    var num1 int
+    fmt.Scan(&num1)  // & gives the address of num1, so Scan can fill it
+
+TOPIC 3: VARIABLE DECLARATION
+=============================
+
+The calculator declares variables before getting input:
+
+    var operation string
+    var num1, num2 int
+
+Multiple Variables Same Type:
+    var num1, num2 int  // Declares both num1 and num2 as integers
+
+This is more efficient than:
+    var num1 int
+    var num2 int
+
+Mixed Type Declaration:
+For mixed types, you must declare separately:
+    var operation string  // string type
+    var num1, num2 int   // integer type
+
+TOPIC 4: SWITCH-CASE IMPLEMENTATION
+===================================
+
+The calculator uses a switch statement to handle different operations:
+
+    switch operation {
+    case "+":
+        fmt.Println("The result will be : ", num1+num2)
+    case "-":
+        fmt.Println("Result : ", num1-num2)
+    case "/":
+        fmt.Println("Result : ", num1/num2)
+    case "*":
+        fmt.Println("The result will be : ", num1*num2)
+    default:
+        fmt.Println("Enter the valid operation")
+    }
+
+How It Works:
+1. Evaluates the operation variable
+2. Matches it against each case
+3. Executes the matching case
+4. Falls through to next case unless break is used
+5. If no match, executes default case
+
+Execution Flow Example:
+If user enters: "+" and 5, 3
+    switch "+" {
+    case "+":  // MATCH!
+        fmt.Println("The result will be : ", 5+3)  // Executes
+        // Ends here (implicit break)
+    }
+    // Output: The result will be : 8
+
+If user enters: "%" (invalid)
+    switch "%" {
+    case "+": // no match
+    case "-": // no match
+    case "/": // no match
+    case "*": // no match
+    default:
+        fmt.Println("Enter the valid operation")  // Executes
+    }
+
+TOPIC 5: ARITHMETIC OPERATIONS
+==============================
+
+The calculator performs four basic arithmetic operations:
+
+Addition:
+    num1 + num2  // Example: 5 + 3 = 8
+
+Subtraction:
+    num1 - num2  // Example: 5 - 3 = 2
+
+Multiplication:
+    num1 * num2  // Example: 5 * 3 = 15
+
+Division:
+    num1 / num2  // Example: 6 / 3 = 2
+    // Note: Integer division truncates: 5 / 2 = 2 (not 2.5)
+
+TOPIC 6: PROGRAM FLOW
+====================
+
+Step-by-Step Execution:
+
+1. Display Welcome Message:
+       fmt.Println("Calculator GO 1.0")
+       fmt.Println("==================")
+
+2. Prompt for Operation:
+       fmt.Println("Which Operation do you want? (add, subtract, multiply, divide)")
+       fmt.Scan(&operation)  // User enters: "+"
+
+3. Prompt for First Number:
+       fmt.Println("Enter the first Number?")
+       fmt.Scanf("%d", &num1)  // User enters: 5
+
+4. Prompt for Second Number:
+       fmt.Println("Enter the second Number")
+       fmt.Scan(&num2)  // User enters: 3
+
+5. Calculate and Display Result:
+       switch operation {
+           case "+":
+               fmt.Println("The result will be : ", 5+3)  // Output: 8
+       }
+
+Example Session:
+    Calculator GO 1.0
+    ==================
+    Which Operation do you want? (add, subtract, multiply, divide)
+    +
+    Enter the first Number?
+    5
+    Enter the second Number
+    3
+    The result will be :  8
+
+TOPIC 7: INPUT FORMAT SPECIFIERS
+===============================
+
+The code uses two different input methods:
+
+fmt.Scan() - Generic Input:
+    fmt.Scan(&operation)  // No format specified
+    fmt.Scan(&num2)       // Works for any type
+
+Automatically detects the variable type and reads accordingly.
+
+fmt.Scanf() - Formatted Input:
+    fmt.Scanf("%d", &num1)  // %d format specifier
+    fmt.Scanf("%s", &operation)  // %s format specifier
+
+Requires explicit format:
+- %d = decimal integer
+- %s = string
+- %f = floating point
+
+The code mixes both approaches, which works but is inconsistent:
+    fmt.Scanf("%d", &num1)  // Formatted
+    fmt.Scan(&num2)         // Generic
+Both work correctly.
+
+TOPIC 8: DATA TYPES IN CALCULATOR
+================================
+
+String Type:
+    var operation string
+    Stores the operation as a string: "+", "-", "*", "/"
+
+Integer Type:
+    var num1, num2 int
+    Stores numbers as integers
+    
+Operations use integer arithmetic:
+    num1 + num2  // Integer addition
+    num1 / num2  // Integer division (truncates decimals)
+
+Integer Division Note:
+    6 / 3 = 2      // Exact division
+    5 / 2 = 2      // Truncates to 2 (not 2.5)
+    7 / 2 = 3      // Truncates to 3 (not 3.5)
+
+If floating-point division was needed, use float64:
+    var num1 float64
+    // Then 5.0 / 2.0 = 2.5
+
+TOPIC 9: ERROR HANDLING LIMITATIONS
+==================================
+
+The current calculator has no error handling:
+
+Potential Issues:
+1. Invalid operation - Handled by default case
+2. Division by zero - NOT handled
+       if num2 == 0:
+           fmt.Println("Cannot divide by zero")
+       But current code doesn't check this
+
+3. Non-numeric input - fmt.Scan will fail silently
+   If user enters "abc" for a number, Scan fails
+
+Better Implementation Would Include:
+    if operation == "/" && num2 == 0 {
+        fmt.Println("Error: Cannot divide by zero")
+        return
+    }
+
+TOPIC 10: IMPROVEMENTS FOR PRODUCTION
+====================================
+
+To make this production-ready:
+
+1. Add division by zero check:
+       if operation == "/" && num2 == 0 {
+           fmt.Println("Cannot divide by zero!")
+           return
+       }
+
+2. Use float64 for better precision:
+       var num1, num2 float64
+       
+3. Validate input:
+       if operation != "+" && operation != "-" && ... {
+           fmt.Println("Invalid operation")
+           return
+       }
+
+4. Add more operations:
+       case "%":
+           fmt.Println("Result : ", num1%num2)  // Modulo
+
+5. Loop for multiple calculations:
+       for {
+           // Take input
+           // Calculate
+           // Ask if user wants to continue
+       }
+
+================================================================================
+KEY TAKEAWAYS:
+================================================================================
+
+1. fmt.Scan() reads user input and requires pointer arguments (&variable)
+2. fmt.Scanf() uses format specifiers for more control
+3. Variables must be declared and receive nil values when pointers are used
+4. Switch statements are ideal for selecting operations based on user input
+5. Integer division truncates decimals: 5 / 2 = 2 (not 2.5)
+6. Default case catches invalid operations
+7. Pointers are essential for input functions to modify variables
+8. This simple calculator lacks error handling (division by zero, invalid input)
+9. Multiple variables of same type can be declared together: var a, b int
+10. The program demonstrates flow control and user interaction concepts
+
+================================================================================
