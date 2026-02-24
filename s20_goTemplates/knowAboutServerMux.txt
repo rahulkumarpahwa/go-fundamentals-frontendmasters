@@ -1,0 +1,201 @@
+Great question — this is fundamental to understanding Go’s HTTP server.
+
+Let’s break it clearly.
+
+---
+
+WHAT DOES THIS DO?
+
+```
+server := http.NewServeMux()
+```
+
+This creates a new request multiplexer.
+
+A ServeMux is basically:
+
+A router that matches incoming URLs to the correct handler.
+
+---
+
+WHAT IS A SERVEMUX?
+
+In Go’s net/http package, a ServeMux is a type that:
+
+* Stores routes
+* Matches URL paths
+* Decides which handler should run
+
+Conceptually:
+
+Incoming Request → ServeMux → Correct Handler
+
+---
+
+WHY DO WE NEED IT?
+
+When a request comes in:
+
+[http://localhost:1999/auth](http://localhost:1999/auth)
+
+The server must decide:
+
+* Which function should handle /auth?
+* Which handler should serve /files/?
+* Which one handles /?
+
+The ServeMux handles this routing.
+
+---
+
+WHAT HAPPENS IN YOUR CODE?
+
+```
+server := http.NewServeMux()
+```
+
+You create a custom router.
+
+Then:
+
+```
+server.HandleFunc("/auth", auth.HandleAuth)
+```
+
+You register a route inside this custom router.
+
+Then:
+
+```
+http.ListenAndServe(":1999", server)
+```
+
+You tell the server:
+
+Use THIS ServeMux to handle requests.
+
+---
+
+WHAT IF WE DON’T USE NewServeMux?
+
+If you write:
+
+```
+http.HandleFunc("/auth", auth.HandleAuth)
+http.ListenAndServe(":1999", nil)
+```
+
+Then Go uses the default ServeMux.
+
+---
+
+WHAT IS THE DEFAULT SERVEMUX?
+
+Inside the http package, there is a global variable:
+
+```
+http.DefaultServeMux
+```
+
+When you do:
+
+```
+http.HandleFunc(...)
+```
+
+You are actually registering routes into:
+
+```
+http.DefaultServeMux
+```
+
+And when you pass nil here:
+
+```
+http.ListenAndServe(":1999", nil)
+```
+
+Go automatically uses:
+
+```
+http.DefaultServeMux
+```
+
+---
+
+WHAT'S THE DIFFERENCE?
+
+Using NewServeMux():
+
+* Creates your own router
+* Cleaner for large apps
+* Better for testing
+* Avoids global state
+
+Using Default:
+
+* Uses global router
+* Quick and simple
+* Less control
+* Uses global state
+
+---
+
+WHY IS USING YOUR OWN SERVEMUX BETTER?
+
+Because:
+
+* No global state
+* Easier to test
+* More modular
+* Cleaner architecture
+
+For bigger projects, always use your own ServeMux.
+
+---
+
+VISUAL UNDERSTANDING
+
+With Custom ServeMux:
+
+Your ServeMux → Handles routes → Passed to server
+
+With Default:
+
+Global DefaultServeMux → Handles everything
+
+---
+
+IMPORTANT DETAIL
+
+These two are equivalent:
+
+Version 1 (Custom):
+
+```
+mux := http.NewServeMux()
+mux.HandleFunc("/auth", handler)
+http.ListenAndServe(":1999", mux)
+```
+
+Version 2 (Default):
+
+```
+http.HandleFunc("/auth", handler)
+http.ListenAndServe(":1999", nil)
+```
+
+---
+
+FINAL SUMMARY
+
+http.NewServeMux():
+
+* Creates a new router instance
+* Lets you control routing explicitly
+* Avoids using the global default router
+
+If you don’t use it:
+
+* Go uses http.DefaultServeMux
+* Routes are stored globally
