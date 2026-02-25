@@ -1,0 +1,19 @@
+What are Go Templates and what can they be used for?
+Go Templates are a framework for formatting strings with a specialized language, primarily used for server-side rendering. They allow inserting special tags within strings and can be used for creating HTML files with embedded Go code and expressions.
+
+
+
+How do you include expressions in a Go Template?
+Expressions in Go Templates are included using double curly braces {{ }}. These can interpolate values, call functions, and use pipelines to modify output.
+
+How do you access values within a Go Template?
+In a Go Template, you access values using the dot (.) notation. If a structure is passed to the template, you can access its properties by using dot followed by the property name, such as .Name.
+But for the direct string passed we can use the . just only.
+
+What methods are available for executing a Go Template?
+Go Templates can be executed in multiple ways: converting to a string, writing directly to an output writer, or serving through a web server. Templates can also include logic like if conditions and range loops.
+
+How do you create and parse a Go Template?
+To create and parse a Go Template, use template.ParseFiles() to read a template file. You can then execute the template using Execute() method, passing a data object to render within the template. If the template is invalid, it will cause a panic.
+
+
