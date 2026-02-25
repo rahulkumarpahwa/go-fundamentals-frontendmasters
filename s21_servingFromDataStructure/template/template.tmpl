@@ -18,8 +18,6 @@
       fetchpriority="high"
     />
 
-    <script src="script.js" defer></script>
-
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -35,25 +33,15 @@
       />
     </h1>
     <main>
-    My name is {{ .name }} <br/>
-    My age is {{ .age }} <br/>
-    My Job is {{ .job }} <br/>
-    My Company is {{ .company }} <br/>
-    <!-- write the . just in the double curly braces, if want to access the string.-->
-    <!---you can't write the empty double curly braces in the comment here--->
+      <!-- write the dot just in the double curly braces, if want to access the string.-->
+      <!---you can't write the empty double curly braces in the comment here--->
 
       <article>
-        <h2>Life in Ancient Greek</h2>
+        <h2>{{ .Title }}</h2>
         <p>
-          Uncover the world of ancient Greece through the sculptures, tools, and
-          jewelry found in ruins from over 2000 years ago that have been
-          unearthed through modern science and technology.
+          {{ .Description }}
         </p>
-        <img
-          src="gallery/ancient-greece.png"
-          fetchpriority="high"
-          decoding="sync"
-        />
+        <img src="/gallery/{{ .Image }}" fetchpriority="high" decoding="sync" />
       </article>
     </main>
   </body>

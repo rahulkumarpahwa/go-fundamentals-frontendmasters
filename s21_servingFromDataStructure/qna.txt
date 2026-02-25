@@ -1,0 +1,21 @@
+What is the purpose of the dot (.) in Go templates?
+The dot is a reference to the object or value being passed as the second argument in the execute method, not a type. It allows accessing properties of the passed object, such as using dot.title or dot.description.
+
+How are trailing commas handled in Go struct definitions?
+Trailing commas are mandatory in Go struct definitions, even when there are no additional properties. This design choice helps prevent errors when adding future properties and simplifies code modifications.
+
+
+What is the syntax for creating a slice constructor in Go?
+In Go, a slice constructor uses curly braces {}, not square brackets. For example: exhibitions := []Exhibition{...} creates a slice of Exhibition type.
+
+What is the difference between an exported and non-exported variable in Go?
+In Go, variables starting with a lowercase letter are non-exported (private), while variables starting with an uppercase letter are exported (public). Non-exported variables can only be accessed within the same package.
+
+How can you create a getter method for a non-exported slice in Go?
+You can create a getter method by defining a function that returns the non-exported slice. For example, a function named GetAll() can return a slice of Exhibition, similar to getter methods in Java or C#.
+
+What is significant about Go template rendering?
+It renders server-side and treats everything as strings
+
+What can you do with Go templates when rendering data?
+Access struct properties using dot notation
