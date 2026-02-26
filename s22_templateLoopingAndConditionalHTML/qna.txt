@@ -1,0 +1,15 @@
+What Go template control structure is used to iterate over a collection of elements?
+Range is used to loop through a collection, where 'dot' represents the current collection and each element during iteration
+
+How can you apply dynamic styling to HTML elements within a Go template?
+You can use inline styling with template expressions, setting attributes like 'style' directly or applying dynamic classes using conditional logic
+
+What syntax can be used to remove unwanted whitespace in Go template declarations?
+A hyphen (-) can be added on either side of the double curly braces to trim whitespace before or after template expressions
+
+How does server-side rendering differ from client-side rendering in this context?
+Server-side rendering generates the full HTML on the server, which can improve initial page load performance compared to client-side rendering that loads content dynamically with JavaScript
+
+What Go template syntax is used to conditionally apply classes or styles?
+The 'if' statement can be used with a boolean property to conditionally set classes or apply styling based on conditions
+

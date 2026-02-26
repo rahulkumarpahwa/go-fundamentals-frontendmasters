@@ -1,0 +1,715 @@
+================================================================================
+S20: GO TEMPLATES - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section introduces Go's template system, a powerful framework for generating
+dynamic strings and HTML with embedded expressions and logic. Templates allow
+server-side rendering (SSR), where the server generates complete HTML before
+sending to the browser. This improves performance, SEO, and user experience
+compared to client-side rendering.
+
+Key Topics Covered:
+- html/template package and basics
+- Template files and structure (.tmpl extension)
+- ParseFiles: Loading templates from disk
+- Execute: Rendering templates with data
+- Dot notation (.) for accessing values
+- WriteHeader and HTTP status codes
+- Double curly braces {{ }} syntax
+- Template expressions and interpolation
+- Server-side rendering fundamentals
+- Replacing static HTML with dynamic templates
+
+================================================================================
+1. WHAT ARE GO TEMPLATES?
+================================================================================
+
+Templates are files (or strings) containing text mixed with special tags that
+allow dynamic content generation. Go's template system is a mini-language for
+creating formatted output with conditional logic and data interpolation.
+
+Definition:
+A template is a format that uses strings with a specialized language inside it.
+Similar concepts exist in many frameworks:
+- Angular: Uses templates with {{ }} interpolation
+- React: Uses JSX (sort of a template)
+- PHP: Mixes HTML with PHP code inline
+- Jinja/Django: Python templating system
+
+Go Templates Characteristics:
+- Limited, restricted language (not full Turing-complete)
+- Designed for simplicity and safety
+- No loops initially (can be added later)
+- Includes expressions using double curly braces {{ }}
+- Can call functions and use pipelines to filter output
+- Used primarily for web pages but can generate any text
+
+From main.go (lines 1-7):
+    package main
+    
+    import (
+        "fmt"
+        "html/template"  // Template package in html module
+        "mod20/auth"
+        "net/http"
+    )
+
+Why Templates Matter:
+- Server-side rendering: Complete HTML generated server-side
+- Performance: Faster page loads (no JavaScript needed)
+- SEO friendly: Search engines see actual content (not JS-rendered)
+- Security: Data sanitization happens on server
+- Simplicity: Logic and presentation together
+
+Example Use Case:
+Instead of browser downloading HTML, then JS, then making API calls and
+rendering content, templates generate complete HTML on server and send it once.
+
+
+================================================================================
+2. THE HTML/TEMPLATE PACKAGE
+================================================================================
+
+Go's html/template package provides the framework for working with templates.
+It's part of the standard library and requires no external dependencies.
+
+Importing Templates:
+    import "html/template"
+
+Key Functions and Methods:
+- template.ParseFiles(filenames ...string) - Load templates from files
+- template.New(name string) - Create named template
+- template.Parse(text string) - Parse template from string
+- Execute(wr io.Writer, data interface{}) - Render template to writer
+- ExecuteToString(data interface{}) - Render to string (not in std lib directly)
+
+From main.go (lines 10-20):
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        html.Execute(w, "Hello from the go file in the template")
+    }
+
+Core Pattern:
+1. Parse template file or create from string
+2. Check for errors (invalid syntax)
+3. Execute template with data
+4. Output written to ResponseWriter
+
+
+================================================================================
+3. TEMPLATE FILES AND STRUCTURE (.TMPL EXTENSION)
+================================================================================
+
+Template files are regular text files (typically with .tmpl or .gotmpl extension)
+containing HTML mixed with template expressions.
+
+File Location and Organization:
+    project/
+    ├── main.go
+    ├── template/              (folder for templates)
+    │   └── template.tmpl      (template file)
+    └── public/
+
+File Extension Options:
+- .tmpl (most common)
+- .html (also works, but .tmpl clarifies it's a template)
+- .gotmpl (explicitly Go template)
+- No extension (works but not recommended)
+
+Basic Template Structure:
+From template/template.tmpl (lines 1-40):
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" href="styles.css" />
+        ...
+      </head>
+      <body>
+        <h1>
+          <img src="images/logo.png" ... />
+        </h1>
+        <main>
+          {{ . }}
+          <!-- Regular HTML below -->
+          <article>
+            <h2>Life in Ancient Greek</h2>
+            ...
+          </article>
+        </main>
+      </body>
+    </html>
+
+Template Content:
+- Mixed HTML and template expressions {{ }}
+- Regular HTML rendered as-is
+- Expressions inside {{ }} processed by template engine
+- {{ . }} outputs the passed data value
+
+
+================================================================================
+4. PARSEFILES: LOADING TEMPLATES FROM DISK
+================================================================================
+
+ParseFiles reads template files from the file system and parses them into
+executable templates. It handles file I/O and template syntax validation.
+
+Signature:
+    func ParseFiles(filenames ...string) (*Template, error)
+
+Returns:
+- *Template: Parsed template ready to execute
+- error: Parsing errors (file not found, syntax errors)
+
+From main.go (line 11):
+    html, err := template.ParseFiles("./template/template.tmpl")
+
+Error Handling Pattern:
+    html, err := template.ParseFiles("./template/template.tmpl")
+    if err != nil {
+        // Handle error: file doesn't exist or has syntax errors
+        w.WriteHeader(http.StatusInternalServerError)
+        w.Write([]byte("Internal Server Error"))
+        return
+    }
+
+Relative vs. Absolute Paths:
+- Relative: "./template/template.tmpl" (relative to where server runs from)
+- Absolute: "/home/user/project/template/template.tmpl" (explicit path)
+
+Multiple Files:
+You can parse multiple template files at once:
+    templates, err := template.ParseFiles(
+        "./template/header.tmpl",
+        "./template/footer.tmpl",
+        "./template/main.tmpl",
+    )
+
+Common Errors and Causes:
+1. File Not Found: Path doesn't exist or wrong working directory
+   Error: "can't read file: no such file or directory"
+
+2. Syntax Error: Invalid template syntax {{ }} or malformed expressions
+   Error: "template: template.tmpl:10: unexpected..."
+
+3. Invalid Encoding: Non-UTF8 characters in template
+   Error: "template contains invalid UTF-8"
+
+
+================================================================================
+5. THE DOT NOTATION (.) FOR ACCESSING VALUES
+================================================================================
+
+The dot (.) is the key to template expressions. It represents the value passed
+to the template's Execute method.
+
+What is the Dot?
+- NOT a Go type
+- A reference to the object/value passed as the second argument to Execute()
+- Can be a string, struct, slice, map, or any Go value
+- The starting point for all template expressions
+
+Simple Dot Example:
+    html.Execute(w, "Hello from the go file in the template")
+    
+    In template:
+    {{ . }}
+    
+    Output:
+    Hello from the go file in the template
+
+From main.go (line 18):
+    html.Execute(w, "Hello from the go file in the template")
+
+From template.tmpl (line 37):
+    {{ . }}
+
+Accessing Struct Properties:
+    type Person struct {
+        Name string
+        Age  int
+        City string
+    }
+    
+    person := Person{Name: "Jane Doe", Age: 30, City: "NYC"}
+    html.Execute(w, person)
+    
+    In template:
+    {{ .Name }}      Output: Jane Doe
+    {{ .Age }}       Output: 30
+    {{ .City }}      Output: NYC
+
+Nested Dot Access:
+    type Address struct {
+        Street string
+        City   string
+    }
+    
+    type Person struct {
+        Name    string
+        Address Address
+    }
+    
+    In template:
+    {{ .Name }}           Output: Name value
+    {{ .Address.City }}   Output: City value
+
+From qna.txt:
+    "the dot is a reference to the object or value being passed as the
+     second argument in the execute method, not a type. It allows accessing
+     properties of the passed object, such as using dot.title or dot.description."
+
+
+================================================================================
+6. EXECUTING TEMPLATES WITH EXECUTE()
+================================================================================
+
+The Execute method renders the template with provided data and writes the
+output to a ResponseWriter.
+
+Signature:
+    func (t *Template) Execute(wr io.Writer, data interface{}) error
+
+Parameters:
+- wr io.Writer: Output destination (http.ResponseWriter for web servers)
+- data interface{}: The value accessible as {{ . }} in template
+- Returns error if execution fails
+
+From main.go (line 17):
+    html.Execute(w, "Hello from the go file in the template")
+
+Complete Example:
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        // Parse template
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        
+        // Prepare data
+        data := "Hello from the go file in the template"
+        
+        // Execute template (writes to ResponseWriter)
+        html.Execute(w, data)
+    }
+
+What Execute Does:
+1. Processes all {{ }} expressions in template
+2. Replaces expressions with their values
+3. Writes result directly to the ResponseWriter
+4. Returns error if rendering fails
+
+Key Point: Execute writes directly to the response, not to a string variable.
+This is efficient for web servers (streaming output as it's generated).
+
+Single Value Limitation:
+Execute takes only ONE value as data. If you need multiple values:
+    Option 1: Create a struct containing multiple fields
+    Option 2: Use a slice
+    Option 3: Use a map
+
+From main.go comment (lines 18-19):
+    // we can pass here only one value either a single string, a struct
+    // or a slice or any other type.
+
+
+================================================================================
+7. WRITEHEADER AND HTTP STATUS CODES
+================================================================================
+
+WriteHeader sends the HTTP status code to the ResponseWriter. It must be called
+BEFORE writing any content to the response body.
+
+Signature:
+    func (w ResponseWriter) WriteHeader(statusCode int)
+
+Common HTTP Status Codes:
+- 200: OK (success)
+- 201: Created
+- 404: Not Found
+- 500: Internal Server Error
+- 503: Service Unavailable
+
+From main.go (lines 14-15):
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)  // 500 status
+        w.Write([]byte("Internal Server Error"))
+    }
+
+Important Rule: Headers Before Body
+```
+This WORKS:
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("Response body"))
+
+This FAILS (header too late):
+    w.Write([]byte("Response body"))
+    w.WriteHeader(http.StatusOK)  // Too late! Headers already sent
+```
+
+Why Headers Must Come First:
+- HTTP protocol: Headers sent first, then body
+- ResponseWriter uses a buffer
+- Once body content is written, headers are locked
+- Changing status code after writing content causes error
+
+From main.go comment (lines 13-14):
+    // Write Header error: if you look at the console, you will have a
+    // Write Header error, it's saying me that I'm sending the Header after
+    // writing content. And on HTTP, it's a buffer, the code goes first. So if
+    // you have already sent somebody to the client, you cannot change the
+    // HTTP code.
+
+Common HTTP Status Codes in Go:
+    w.WriteHeader(http.StatusOK)                // 200
+    w.WriteHeader(http.StatusCreated)           // 201
+    w.WriteHeader(http.StatusBadRequest)        // 400
+    w.WriteHeader(http.StatusUnauthorized)      // 401
+    w.WriteHeader(http.StatusNotFound)          // 404
+    w.WriteHeader(http.StatusInternalServerError) // 500
+
+
+================================================================================
+8. DOUBLE CURLY BRACES AND TEMPLATE EXPRESSIONS
+================================================================================
+
+Double curly braces {{ }} delimit template expressions. Everything inside is
+processed as a template action; everything outside is output as-is.
+
+Basic Syntax:
+    {{ expression }}
+    
+    Whitespace acceptable:
+    {{.Name}}
+    {{ .Name }}
+    {{  .Name  }}
+    All equivalent
+
+Expression Types:
+1. Dot reference: {{ . }}
+2. Property access: {{ .Title }}
+3. Nested access: {{ .Person.Name }}
+4. Function calls: {{ .GetValue }}
+
+From template.tmpl (lines 37, 41-43):
+    <main>
+      {{ . }}
+      <article>
+        <h2>Life in Ancient Greek</h2>
+        ...
+      </article>
+    </main>
+
+Invalid Template Expressions:
+- Empty braces: {{ }} (error)
+- Unmatched braces {{ . (error)
+- No spacing on comments (needs special syntax)
+
+Accessing in Comments:
+Cannot use standard {{ }} in HTML comments (breaks template parser):
+    <!-- This breaks: {{ . }} -->  // Error!
+    
+    Solution: Use template comment syntax:
+    {{/* This is a template comment */}}
+
+From template.tmpl (lines 39-40):
+    <!-- write the . just in the double curly braces, if want to access the string.-->
+    <!---you can't write the empty double curly braces in the comment here--->
+
+Escaping HTML:
+html/template automatically escapes HTML characters to prevent injection:
+    Data: "<script>alert('XSS')</script>"
+    Rendered as: &lt;script&gt;alert('XSS')&lt;/script&gt;
+
+
+================================================================================
+9. TEMPLATE EXPRESSIONS: PIPELINES AND FUNCTIONS
+================================================================================
+
+Pipelines allow chaining operations on data. Expressions can call functions and
+apply filters, similar to Unix pipes.
+
+Pipeline Syntax:
+    {{ value | function1 | function2 }}
+
+Each stage passes its output to the next function.
+
+Common Built-in Template Functions:
+- {{ .Value | html }} - Escape HTML
+- {{ .Value | url }} - URL escape
+- {{ .Value | js }} - JavaScript escape
+- {{ .Value | json }} - Convert to JSON
+- {{ .Value | printf "%d" }} - Format output
+
+Real-world Example (not in code, but concept):
+```
+Price: {{ .Price | printf "$%.2f" }}
+
+If Price is 19.5:
+Output: Price: $19.50
+
+Explanation:
+1. .Price evaluates to 19.5
+2. Pipe passes it to printf
+3. printf formats it as $19.50
+```
+
+Function Calls:
+Templates can call functions defined in your Go code:
+    {{ .ToString }}  // Call ToString method on dot value
+
+Pipelines vs Angular:
+Similar to Angular pipes:
+Angular: {{ date | date:'shortDate' | uppercase }}
+Go:      {{ .Date | dateFormat | uppercase }}
+
+From main.go comment (lines 53-62):
+    // examples in angular:
+    // So for example, you wanna render a price, well, you can parse that
+    // through A pipe that will add the currency, the character, like the
+    // dollar sign or the euro sign. And then you can parse for another pipe
+    // that can format the number with two digits, and then you can go for
+    // another pipe that can convert into Bitcoin.
+
+
+================================================================================
+10. CONDITIONAL LOGIC: IF-ELSE IN TEMPLATES
+================================================================================
+
+Templates support conditional execution using {{ if }}, {{ else }}, {{ end }}
+syntax.
+
+Syntax:
+    {{ if condition }}
+        content shown if true
+    {{ else }}
+        content shown if false
+    {{ end }}
+
+conditions:
+    {{ if .IsActive }}  // Truthy check
+    {{ if eq .Status "active" }}  // Equality check
+    {{ if ne .Count 0 }}  // Inequality check
+    {{ if .Count }}  // Non-zero/non-empty check
+
+Built-in Comparison Functions:
+- eq: equals
+- ne: not equals
+- lt: less than
+- le: less than or equal
+- gt: greater than
+- ge: greater than or equal
+
+Example (not in code but important concept):
+```
+{{ if .IsLoggedIn }}
+    <p>Welcome, {{ .Name }}!</p>
+{{ else }}
+    <p>Please log in</p>
+{{ end }}
+```
+
+From main.go comment (line 62):
+    // Also, we have if-else and range for loops.
+
+
+================================================================================
+11. RANGE LOOPS IN TEMPLATES
+================================================================================
+
+Range allows iterating over slices, arrays, and maps in templates.
+
+Syntax:
+    {{ range .Items }}
+        {{ . }}  // Current item
+    {{ end }}
+
+With Index and Value:
+    {{ range $index, $item := .Items }}
+        <p>Item {{ $index }}: {{ $item }}</p>
+    {{ end }}
+
+Example (not in code but important):
+```
+{{ range .Articles }}
+    <article>
+        <h2>{{ .Title }}</h2>
+        <p>{{ .Description }}</p>
+    </article>
+{{ end }}
+```
+
+Empty Slice Handling:
+    {{ range .Items }}
+        <p>{{ . }}</p>
+    {{ else }}
+        <p>No items found</p>
+    {{ end }}
+
+From main.go comment (line 62):
+    // Also, we have if-else and range for loops.
+
+
+================================================================================
+12. TEMPLATE WORKFLOW: FROM FILES TO RENDERED HTML
+================================================================================
+
+Complete process of loading, parsing, and rendering templates.
+
+Step-by-Step Workflow:
+
+1. REQUEST ARRIVES
+   Browser requests /template route
+
+2. HANDLER CALLED
+   HTTP router calls handleTemplate function
+
+3. PARSE TEMPLATE
+   html, err := template.ParseFiles("./template/template.tmpl")
+   - Reads file from disk
+   - Parses syntax
+   - Validates expressions
+
+4. CHECK ERRORS
+   if err != nil
+   - File not found
+   - Syntax errors in template
+   - Return HTTP 500 if problem
+
+5. PREPARE DATA
+   data := "Hello from the go file in the template"
+   - Create value to pass
+   - Can be string, struct, slice, etc.
+
+6. EXECUTE TEMPLATE
+   html.Execute(w, data)
+   - Process all {{ }} expressions
+   - Replace with actual values
+   - Write to ResponseWriter
+
+7. BROWSER RECEIVES
+   Complete HTML rendered server-side
+   No need for JavaScript to generate content
+
+From main.go (lines 10-18):
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        html.Execute(w, "Hello from the go file in the template")
+    }
+
+Efficiency:
+- Template parsed only once when first requested (can optimize with caching)
+- Execute runs every request
+- Entire HTML generated and sent in one response
+- No additional requests needed for content
+
+
+================================================================================
+13. REPLACING STATIC HTML WITH TEMPLATES
+================================================================================
+
+Transition from serving static HTML files to dynamic template-based rendering.
+
+Before (Static HTML):
+    server.Handle("/", http.FileServer(http.Dir("./public")))
+    
+    - Serves index.html file as-is
+    - Same content every request
+    - No dynamic data insertion
+    - No server-side rendering
+
+After (Dynamic Templates):
+    server.HandleFunc("/template", handleTemplate)
+    
+    - Parses template on each request
+    - Can pass different data
+    - Complete HTML generated server-side
+    - Content can be data-driven
+
+Key Advantages:
+1. Dynamic Content: Display different data per request
+2. Server-side Rendering: Full HTML sent to browser
+3. No JavaScript Needed: Content visible immediately
+4. SEO Friendly: Search engines see actual content
+5. Performance: Fewer requests, faster page load
+
+From main.go (lines 10-18):
+The handleTemplate function demonstrates this pattern.
+
+Route Organization:
+    server.HandleFunc("/template", handleTemplate)  // Dynamic
+    server.Handle("/", fs)                          // Static files
+
+This allows both simultaneously:
+- Dynamic routes with templates
+- Static files (CSS, JS, images) from public folder
+
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. Templates Overview:
+   - Mini-language for generating formatted output
+   - Mixed HTML with {{ }} expressions
+   - Server-side rendering (complete HTML on server)
+   - Simpler syntax than building strings programmatically
+
+2. html/template Package:
+   - Standard library (no external dependencies)
+   - ParseFiles loads templates from disk
+   - Execute renders templates to ResponseWriter
+   - Automatically escapes HTML for security
+
+3. Dot Notation:
+   - {{ . }} represents passed data value
+   - {{ .PropertyName }} accesses struct fields
+   - {{ .Nested.Property }} for deeper access
+   - Only one value passed to Execute()
+
+4. Template Processing:
+   - Parse template (validate syntax)
+   - Execute with data
+   - Render to output
+   - Send to browser
+
+5. Key Rules:
+   - WriteHeader before Write
+   - {{ }} for expressions, everything else literal
+   - Escape HTML automatically (security)
+   - Functions for extending template capabilities
+
+6. Advanced Features:
+   - Pipelines for function chaining
+   - If-else for conditionals
+   - Range for loops over slices/maps
+   - Nested property access
+
+7. Performance:
+   - All rendering happens on server
+   - Faster browser rendering (no JavaScript needed)
+   - Complete HTML in single response
+   - Good for SEO and user experience
+
+8. Comparison to Client-Side Rendering:
+   - Static files: HTML sent, JavaScript generates content (slower)
+   - Templates: Complete HTML sent, ready to display (faster)
+
+NEXT SECTION: s21_servingFromDataStructure
+- Combine templates with data structures
+- Pass structs to templates
+- Render data-driven pages
+- Access struct properties in templates
+================================================================================

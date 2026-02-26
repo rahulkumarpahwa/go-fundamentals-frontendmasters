@@ -1,0 +1,791 @@
+================================================================================
+S21: SERVING FROM DATA STRUCTURE - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section builds on templates (s20) by combining them with data structures.
+Instead of passing simple strings to templates, we create Go structs to hold
+exhibition data and pass struct instances to templates. Templates then access
+struct properties using dot notation. This pattern demonstrates data-driven
+template rendering and the fundamentals of content management systems.
+
+Key Topics Covered:
+- Struct design for domain data
+- Exported vs. non-exported variables
+- Getter and setter methods (encapsulation pattern)
+- Slice constructors in Go
+- Trailing commas in struct literals
+- Passing structs to templates
+- Accessing struct properties in templates
+- Data-driven rendering
+- Museum/exhibition example implementation
+
+================================================================================
+1. FROM TEMPLATES WITH STRINGS TO TEMPLATES WITH DATA
+================================================================================
+
+S20 showed passing simple strings to templates. S21 advances this to passing
+complete data structures (structs), making templates truly data-driven.
+
+S20 Pattern (Simple String):
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        html.Execute(w, "Hello from the go file in the template")
+    }
+    
+    In template:
+    {{ . }}
+    
+    Output: Simple string value
+
+S21 Pattern (Struct Data):
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        html.Execute(w, data.GetAll()[0])  // Pass first exhibition struct
+    }
+    
+    In template:
+    {{ .Title }}
+    {{ .Description }}
+    {{ .Image }}
+    
+    Output: Exhibition properties rendered
+
+From main.go (line 18):
+    html.Execute(w, data.GetAll()[0])
+
+Key Difference:
+- S20: Single value (string)
+- S21: Complex value (struct with properties)
+
+Why This Matters:
+- Encapsulates related data together
+- Reduces parameter passing
+- Enables domain modeling
+- Foundation for databases and APIs
+
+
+================================================================================
+2. DESIGNING THE EXHIBITION STRUCT
+================================================================================
+
+Structs organize related data into a cohesive type. The Exhibition struct
+represents a museum exhibition (or article).
+
+Struct Definition:
+From data/exhibitions.go (lines 3-7):
+    type Exhibition struct {
+        Title       string
+        Description string
+        Image       string
+    }
+
+Field Naming:
+- Title: The exhibition title (exported: uppercase)
+- Description: Detailed description text (exported: uppercase)
+- Image: Image filename (exported: uppercase)
+
+Why Exported (Capitalized)?
+- Can be accessed from other packages (including templates)
+- Lowercase fields would be private to the data package
+- Template needs to access properties
+
+Field Types:
+All string fields for simplicity:
+    Title       string    // "Aristotle: Life and Legacy"
+    Description string    // "Explore the life and legacy..."
+    Image       string    // "aristotle.png"
+
+Could include other types:
+    type Exhibition struct {
+        ID          int       // Unique identifier
+        Title       string    // Display name
+        Description string    // Full text
+        Image       string    // Image filename
+        Year        int       // When from (e.g., 400 BC)
+        Rating      float64   // User rating
+        IsFeatured  bool      // Featured in main display
+    }
+
+From qna.txt:
+    "What is the purpose of the dot (.) in Go templates?
+     The dot is a reference to the object or value being passed as the
+     second argument in the execute method, not a type."
+
+
+================================================================================
+3. SLICE CONSTRUCTORS AND COLLECTION INITIALIZATION
+================================================================================
+
+Create a slice of Exhibition structs to hold multiple exhibitions. Uses Go's
+slice constructor syntax with curly braces.
+
+Slice vs Array:
+- Array: Fixed size [4]Exhibition
+- Slice: Dynamic size []Exhibition
+
+Slice Constructor Syntax:
+From data/exhibitions.go (lines 9-10):
+    var list = []Exhibition{
+        // Struct values inside
+    }
+
+Syntax Breakdown:
+    []Exhibition{  // Slice type constructor
+        {          // First struct
+            Title: "Value",
+            Description: "Text",
+            Image: "file.png",
+        },
+        {          // More structs...
+        },
+    }
+
+Key Points:
+- []Exhibition{ } - Slice constructor (not array [n]Exhibition{ })
+- Opening brace { } - Constructor delimiter (not square brackets)
+- Each struct literal goes inside {}
+- Commas separate items
+- Trailing comma after last item (mandatory)
+
+From main.go comment (line 60):
+    // []Exhibition{ , Remember this is the constructor of a slice of
+    // exhibition. The constructor angle is always curly braces, so it's not
+    // actually a square brackets as an array in JSON, a reminder.
+
+From data/exhibitions.go (lines 9-43):
+    var list = []Exhibition{
+        {
+            Title:       "Life in Ancient Greek",
+            Description: "Uncover the world of ancient Greece...",
+            Image:       "ancient-greece.png",
+        },
+        {
+            Title:       "Aristotle: Life and Legacy",
+            Description: "Explore the life and legacy...",
+            Image:       "aristotle.png",
+        },
+        {
+            Title:       "Chameleon: Colorful Adaptations",
+            Description: "Discover the amazing world...",
+            Image:       "colorful-adaptations.png",
+        },
+        {
+            Title:       "Sea Monsters: Myth and Reality",
+            Description: "Dive into the world...",
+            Image:       "sea-monsters.png",
+        },
+    }
+
+This creates a slice with 4 Exhibition values.
+
+
+================================================================================
+4. TRAILING COMMAS: MANDATORY GO STYLE
+================================================================================
+
+In Go, trailing commas are required in multi-line struct literals and slices,
+even after the last element.
+
+The Rule:
+Every element, including the last one, must have a comma.
+
+Example - WITH Trailing Comma (Correct):
+    var list = []Exhibition{
+        {
+            Title:       "Ancient Greece",
+            Description: "History",
+            Image:       "ancient.png",
+        },  // <- Comma here (after last field)
+        {
+            Title:       "Aristotle",
+            Description: "Philosophy",
+            Image:       "aristotle.png",
+        },  // <- Comma here (after last struct in slice)
+    }
+
+Example - WITHOUT Trailing Comma (Error):
+    var list = []Exhibition{
+        {
+            Title:       "Ancient Greece",
+            Description: "History",
+            Image:       "ancient.png"  // <- Missing comma!
+        }
+    }
+    // Compile error: expected ',', found '}'
+
+From data/exhibitions.go (line 32):
+    Image:       "sea-monsters.png",  // <- Trailing comma mandatory
+
+
+Why This Design?
+From main.go (lines 75-80):
+    // So you always need to have a trailing comma, does anyone think on a
+    // reason of why they did that this way? At least the reason we did it
+    // at my last job was so that if someone added other things afterward it
+    // wouldn't count that line as a change in GitHub.
+
+Benefits:
+1. Git Diffs: Adding new element doesn't mark previous line as changed
+2. Consistency: All items formatted the same way
+3. Simplicity: Follows "keep it simple" goal of Go
+4. Prevention: Avoids the "missing comma" error common in JSON
+
+Finding Missing Commas:
+Golang compiler error will show the line and point to the issue.
+
+
+================================================================================
+5. EXPORTED VS. NON-EXPORTED VARIABLES: ENCAPSULATION
+================================================================================
+
+Go uses naming conventions for visibility. Capitalized names are exported
+(public), lowercase names are non-exported (private).
+
+Definition:
+- EXPORTED: Accessible from other packages (uppercase first letter)
+- NON-EXPORTED: Only accessible within the same package (lowercase first letter)
+
+Example:
+From data/exhibitions.go:
+    var list = []Exhibition{ }  // non-exported (private)
+    
+    func GetAll() []Exhibition {  // EXPORTED
+        return list
+    }
+
+Why This Pattern (Encapsulation):
+Without encapsulation, code could modify list directly:
+    // Bad practice (if list was exported):
+    data.List[0].Title = "Hacked"  // Anyone can change anything
+    data.List = []Exhibition{}     // Anyone can clear all data
+
+With encapsulation through getter:
+    // Safe:
+    exhibitions := data.GetAll()   // Read-only access (cannot modify original)
+
+Non-Exported Variable:
+From data/exhibitions.go (lines 8-43):
+    var list = []Exhibition{
+        // Exhibition data
+    }
+
+The lowercase 'l' makes this private to the data package.
+
+From main.go comment (line 63):
+    // And this is 'list' with lowercase l, I did this on purpose, that
+    // means it's not exported. Just to show you that we can implement the
+    // pattern of, for example, creating a getter.
+
+
+================================================================================
+6. GETTER AND SETTER METHODS: ACCESS CONTROL
+================================================================================
+
+Getter methods provide read-only access; setter methods provide controlled
+write access. This is Go's approach to encapsulation (not private fields).
+
+Getter Method:
+From data/exhibitions.go (lines 48-50):
+    func GetAll() []Exhibition {  // EXPORTED (capital G)
+        return list               // Return non-exported variable
+    }
+
+Purpose:
+- Access non-exported data
+- Returns a copy (conceptually)
+- Called from other packages
+- Provides read-only interface
+
+Usage:
+From main.go (line 18):
+    html.Execute(w, data.GetAll()[0])  // Get all, then first element
+
+Setter Method:
+From data/exhibitions.go (lines 45-47):
+    func Add(e Exhibition) {   // EXPORTED
+        list = append(list, e)  // Modify non-exported variable
+    }
+
+Purpose:
+- Controlled modification of data
+- Business logic (validation could go here)
+- Called from other packages
+
+Usage Example:
+    newExhibition := Exhibition{
+        Title:       "New Exhibition",
+        Description: "Description",
+        Image:       "image.jpg",
+    }
+    data.Add(newExhibition)  // Add to collection
+
+From qna.txt:
+    "How can you create a getter method for a non-exported slice in Go?
+     You can create a getter method by defining a function that returns
+     the non-exported slice."
+
+Benefits:
+1. Encapsulation: Hide internal implementation
+2. Validation: Add business logic in setters
+3. Evolution: Change internal structure without breaking API
+4. Thread-safety: Can add locking in getters/setters
+
+
+================================================================================
+7. ACCESSING STRUCT PROPERTIES IN TEMPLATES
+================================================================================
+
+Once a struct is passed to a template, access its properties using dot notation
+with the property name.
+
+Property Access Syntax:
+    {{ .PropertyName }}
+
+Example from Template:
+From template/template.tmpl (lines 42-45):
+    <article>
+        <h2>{{ .Title }}</h2>
+        <p>
+            {{ .Description }}
+        </p>
+        <img src="/gallery/{{ .Image }}" ... />
+    </article>
+
+When Executed With:
+    exhibition := data.GetAll()[0]  // First exhibition
+    html.Execute(w, exhibition)
+    
+    Props accessed:
+    - {{ .Title }} outputs: "Life in Ancient Greek"
+    - {{ .Description }} outputs: Full description text
+    - {{ .Image }} outputs: "ancient-greece.png"
+
+Type Safety:
+Go templates are type-aware:
+    "Exhibition Title: " + exhibition.Title  // Compile-time safety
+    
+    In template, Go validates property existence
+    If property doesn't exist: Template error (fails gracefully)
+
+Multiple Properties:
+    {{ .Title }}
+    {{ .Description }}
+    {{ .Image }}
+    
+    All three access the same struct ({{ . }})
+    Properties can be used multiple times
+
+From qna.txt:
+    "How are you accessing struct properties in templates?
+     Directly with dot notation (e.g., {{ .Title }})"
+
+Nested Structures:
+If Exhibition had nested structs:
+    type Museum struct {
+        Name string
+    }
+    
+    type Exhibition struct {
+        Title  string
+        Museum Museum
+    }
+    
+    Template access:
+    {{ .Title }}         // Exhibition title
+    {{ .Museum.Name }}   // Nested museum name
+
+
+================================================================================
+8. PASSING DIFFERENT EXHIBITIONS: INDEX ACCESS
+================================================================================
+
+The data.GetAll() returns a slice. Use index access [n] to select specific
+exhibitions.
+
+Slice Index Access:
+    exhibitions := data.GetAll()
+    
+    first   := exhibitions[0]  // First (ancient greece)
+    second  := exhibitions[1]  // Second (aristotle)
+    third   := exhibitions[2]  // Third (chameleon)
+    fourth  := exhibitions[3]  // Fourth (sea monsters)
+
+From main.go (line 18):
+    html.Execute(w, data.GetAll()[0])  // Pass first exhibition
+
+Inline Access (s21 pattern):
+    data.GetAll()[0]  // Get all, then access index 0
+
+Creating Different Routes:
+    func handleExhibition1(w http.ResponseWriter, r *http.Request) {
+        html, _ := template.ParseFiles("./template/template.tmpl")
+        html.Execute(w, data.GetAll()[0])  // First exhibition
+    }
+    
+    func handleExhibition2(w http.ResponseWriter, r *http.Request) {
+        html, _ := template.ParseFiles("./template/template.tmpl")
+        html.Execute(w, data.GetAll()[1])  // Second exhibition
+    }
+    
+    And in main:
+    server.HandleFunc("/exhibition/1", handleExhibition1)
+    server.HandleFunc("/exhibition/2", handleExhibition2)
+
+Rendering All Exhibitions:
+Instead of passing single index, pass entire slice:
+    html.Execute(w, data.GetAll())
+    
+    Then in template use range loop:
+    {{ range . }}
+        <h2>{{ .Title }}</h2>
+        <p>{{ .Description }}</p>
+    {{ end }}
+
+Data Source Flexibility:
+- Hardcoded slice: Like current s21
+- Database: SELECT * FROM exhibitions
+- JSON file: Parse from gallery/data.json
+- API: Fetch from remote service
+
+All use same template rendering pattern.
+
+
+================================================================================
+9. COMPLETE DATA-DRIVEN RENDERING WORKFLOW
+================================================================================
+
+End-to-end process from request to rendered HTML with struct data.
+
+Request Flow:
+
+1. REQUEST
+   Browser: GET /template
+
+2. ROUTE MATCHING
+   Server: Finds handleTemplate function
+
+3. TEMPLATE PARSING
+   Code: html, _ := template.ParseFiles("./template/template.tmpl")
+   - Reads template file from disk
+   - Parses {{ }} expressions
+   - Validates syntax
+
+4. DATA RETRIEVAL
+   Code: data.GetAll()[0]
+   - Calls GetAll() getter
+   - Returns slice of Exhibition
+   - Access index [0] (first exhibition)
+   - Returns Exhibition struct
+
+5. TEMPLATE EXECUTION
+   Code: html.Execute(w, exhibition)
+   - Processes template with exhibition data
+   - Replaces {{ .Title }} with "Life in Ancient Greek"
+   - Replaces {{ .Description }} with full text
+   - Replaces {{ .Image }} with "ancient-greece.png"
+
+6. HTML GENERATION
+   Template produces:
+   ```
+   <article>
+       <h2>Life in Ancient Greek</h2>
+       <p>Uncover the world of ancient Greece...</p>
+       <img src="/gallery/ancient-greece.png" ... />
+   </article>
+   ```
+
+7. RESPONSE SENT
+   Complete HTML sent to browser
+   Browser renders immediately
+   No JavaScript needed
+
+From main.go (lines 10-18):
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        html.Execute(w, data.GetAll()[0])
+    }
+
+This is SERVER-SIDE RENDERING: complete HTML generated on server.
+
+
+================================================================================
+10. COMPARISON WITH CLIENT-SIDE RENDERING
+================================================================================
+
+S19 and s21 contrast two rendering approaches used in web development.
+
+CLIENT-SIDE RENDERING (Traditional Approach):
+1. Server sends HTML + JavaScript
+2. Browser parses HTML, loads JS
+3. JavaScript makes API request for JSON
+4. Browser waits for JSON response
+5. JavaScript parses JSON
+6. JavaScript injects HTML into DOM
+7. User finally sees content
+
+Timeline:
+    0ms: Request sent
+    100ms: HTML + JS received
+    200ms: JS makes API request
+    300ms: JSON response arrives
+    350ms: JavaScript renders content
+    400ms: User sees page
+
+User Experience: Blank page for ~300ms before content appears
+
+SERVER-SIDE RENDERING (s21 Approach):
+1. Browser requests /template
+2. Server retrieves data
+3. Server renders complete HTML
+4. Server sends HTML to browser
+5. Browser displays immediately
+
+Timeline:
+    0ms: Request sent
+    100ms: Complete HTML received
+    150ms: Browser renders
+    200ms: User sees page
+
+User Experience: Content visible immediately
+
+From main.go (lines 82-87):
+    // But that's not so performant, because we need the user has to wait for
+    // JavaScript to load to then go and grab a JSON And then when we have the
+    // JSON, it needs to generate that HTML dynamically.
+    // ...
+    // So I want to create all these articles server-side, so the browser will
+    // receive just HTML.
+
+Advantages of Server-Side Rendering:
+1. Faster Initial Load: Complete content immediately
+2. SEO: Search engines see actual HTML (not JS-rendered)
+3. Less JavaScript: Reduces client-side complexity
+4. Better for Low-End Devices: Minimal client processing
+5. Accessibility: Works without JavaScript
+
+Disadvantages of Server-Side Rendering:
+1. Server Load: More processing per request
+2. Less Interactive: Full page reload for changes
+3. Caching: Harder to cache dynamic content
+
+When to Use Each:
+- SSR: Content-heavy sites, SEO critical, initial performance critical
+- CSR: Interactive apps, real-time updates, offline capability
+
+
+================================================================================
+11. REMOVING JAVASCRIPT FROM TEMPLATES
+================================================================================
+
+When using server-side rendering with templates, JavaScript often becomes
+unnecessary. The template renders content server-side, eliminating the need
+for client-side rendering scripts.
+
+Before (CSR with JavaScript):
+    <!-- Template sends this HTML -->
+    <html>
+    <head>
+        <script src="script.js"></script>
+    </head>
+    <body>
+        <main id="articles"></main>
+    </body>
+    </html>
+    
+    // script.js:
+    fetch('/api/exhibitions')
+        .then(r => r.json())
+        .then(data => {
+            data.forEach(ex => {
+                const html = `<article>...${ex.title}...</article>`;
+                document.querySelector('main').innerHTML += html;
+            });
+        });
+
+Problems:
+- User sees blank page while JS loads
+- Network request needed for JSON
+- Browser parses JSON and renders HTML
+- Complex and slow
+
+After (SSR with Templates):
+    <!-- Template renders this HTML -->
+    <html>
+    <head>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <main>
+            <article>
+                <h2>{{ .Title }}</h2>
+                <p>{{ .Description }}</p>
+            </article>
+        </main>
+    </body>
+    </html>
+
+Benefits:
+- No JavaScript needed for content display
+- Executes on server, not browser
+- Complete HTML sent in response
+- Instant display
+
+From main.go (lines 83-87):
+    // But now, we are setting that this is bad for performance, so we can do
+    // server-side rendering. That is, maybe we can actually inject in the HTML
+    // all the articles directly from a static collection that you have somewhere.
+    // ...
+    // We can even get rid of JavaScript at all.
+
+Using JavaScript Now (Optional):
+Still use JS for interactivity:
+- Form validation
+- Tooltips and popovers
+- Animation and transitions
+- Real-time features
+
+But NOT for rendering content.
+
+
+================================================================================
+12. FROM HARDCODED DATA TO FLEXIBLE SOURCES
+================================================================================
+
+S21 uses hardcoded Exhibition slice. In production, data would come from various
+sources with the SAME rendering pattern.
+
+Current (Hardcoded):
+From data/exhibitions.go:
+    var list = []Exhibition{
+        { Title: "...", Description: "...", Image: "..." },
+        // More exhibitions hardcoded
+    }
+
+Alternative: JSON File
+    // Load from gallery/data.json
+    data := LoadFromJSON("gallery/data.json")
+    
+    Rendering unchanged:
+    html.Execute(w, data)
+
+Alternative: Database
+    // Load from PostgreSQL/MySQL
+    exhibitions := db.Query("SELECT * FROM exhibitions")
+    
+    Rendering unchanged:
+    html.Execute(w, exhibitions[0])
+
+Alternative: API
+    // Load from remote service
+    response, _ := http.Get("https://api.museum.com/exhibitions")
+    exhibitions := parseJSON(response)
+    
+    Rendering unchanged:
+    html.Execute(w, exhibitions[0])
+
+Key Point:
+Template rendering doesn't care about data source. As long as Exhibition structs
+have Title, Description, Image fields, the template works.
+
+This is separation of concerns:
+- Data layer: Where data comes from
+- Template layer: How data is displayed
+- Changes in one don't affect the other
+
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. Data-Driven Rendering:
+   - Pass structs to templates (not just strings)
+   - Templates access properties with dot notation
+   - Enables dynamic, flexible content rendering
+
+2. Struct Design:
+   - Export properties (capitalize) to make accessible
+   - Organize related data together
+   - Define clear types for domain entities
+
+3. Encapsulation Pattern:
+   - Private data (lowercase list)
+   - Public getter (GetAll())
+   - Public setter (Add())
+   - Controlled access to internal state
+
+4. Collection Handling:
+   - Slice constructors: []Type{}
+   - Trailing commas mandatory
+   - Index access for single items
+   - Range loops for all items
+
+5. Template Variables:
+   - Non-exported variables declared in package
+   - Exported functions access non-exported data
+   - Other packages call exported functions
+   - Go's approach to information hiding
+
+6. Rendering Workflow:
+   - Parse template
+   - Retrieve data via getter
+   - Execute template with data
+   - Browser receives complete HTML
+
+7. SSR Advantages:
+   - Faster initial page load
+   - Better SEO
+   - No JavaScript rendering overhead
+   - Simpler client-side code
+
+8. Flexible Data Sources:
+   - Same template works with hardcoded data, JSON, database, API
+   - Struct fields matter, not data origin
+   - Decouples rendering from data storage
+
+9. Museum Example:
+   - Exhibition struct with Title, Description, Image
+   - Slice of exhibitions
+   - Getter provides access
+   - Templates display individual exhibitions
+
+10. Next Steps:
+    - Multiple exhibitions per page (range loops)
+    - Dynamic routing (different exhibitions per URL)
+    - Database integration
+    - User interaction and forms
+
+================================================================================
+SECTIONS 20-21 SUMMARY: TEMPLATES & DATA
+================================================================================
+
+S20 (Go Templates):
+- Template syntax and features
+- Dot notation for expressions
+- ParseFiles and Execute
+- Server-side rendering basics
+
+S21 (Serving From Data Structure):
+- Combining templates with structs
+- Encapsulation (private data + getters)
+- Passing complex data to templates
+- Data-driven rendering
+
+Together: Foundation for building dynamic web applications in Go
+Next: Advanced features like loops, conditionals, and database integration
+================================================================================
