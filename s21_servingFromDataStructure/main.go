@@ -42,6 +42,8 @@ func main() {
 // if you go in the public folder, in gallery we have data.json,that's the JSON. We could read the JSON and use our marshal solutions to have it back, that's one option.We can do that because we have already been playing with JSON.
 // (we will do self here only again at new route "/json".)
 
+
+
 // way 2:
 // We can just create like static for now, structure in Go with that information.
 

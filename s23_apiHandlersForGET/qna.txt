@@ -1,0 +1,29 @@
+How can you create a JSON encoder in Go to directly write JSON to an HTTP response?
+Use json.NewEncoder() with the ResponseWriter as an argument, then call Encode() on the encoder to write JSON directly to the output stream without creating an intermediate string.
+
+What function can be used to convert a query parameter string to an integer in Go?
+Use strconv.Atoi(), which parses a string to an integer using base 10, and returns the converted value and a potential error.
+
+How do you set a content type header for a JSON response in Go?
+Use w.Header().Set("Content-Type", "application/json") to specify that the response is a JSON content type.
+
+What method can be used to quickly return an HTTP error response in Go?
+Use http.Error() function, which takes the ResponseWriter, an error message, and an HTTP status code as arguments to send an error response.
+
+Why do query parameters in Go requests always return a slice even when only one value is provided?
+Because the HTTP protocol allows multiple values for the same parameter, so query parameters are always returned as a slice, even if only one value is present.
+
+What method can be used in Go to directly encode JSON to a writer without creating a temporary string in memory?
+json.NewEncoder(writer).Encode(data)
+
+How can you retrieve a query parameter from an HTTP request in Go?
+r.URL.Query().Get("id")
+
+What function is used to convert a string to an integer in Go?
+strconv.Atoi()
+
+How can you set a content type header in an HTTP response?
+w.Header().Set("Content-Type", "application/json")
+
+What is the standard method to return an error response in an HTTP handler?
+http.Error(w, "error message", http.StatusBadRequest)
