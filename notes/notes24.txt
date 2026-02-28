@@ -1,0 +1,714 @@
+================================================================================
+S24: API HANDLERS FOR POST - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section extends API capabilities by implementing POST request handlers.
+While S23 covered retrieving data with GET requests, S24 focuses on creating
+new resources by accepting JSON data from clients, decoding it into Go structs,
+and storing it in the application's data structures. This is essential for 
+building complete CRUD (Create, Read, Update, Delete) APIs where clients can 
+send data to the server to create or modify resources.
+
+Key Topics Covered:
+- Checking HTTP request methods in handlers
+- Handling POST requests separately from other methods
+- Decoding JSON from request body with json.NewDecoder()
+- Using the address operator (&) to modify variables
+- The append() function for adding elements to slices
+- HTTP status code 201 (StatusCreated) for successful creation
+- Error handling for invalid JSON input
+- HTTP status code 405 (MethodNotAllowed) for unsupported methods
+- Testing POST requests with tools like Postman
+- Separating GET and POST logic into dedicated handlers
+- Server-side data validation basics
+- In-memory data persistence during server lifetime
+
+================================================================================
+1. UNDERSTANDING POST REQUESTS
+================================================================================
+
+HTTP Methods Review:
+    GET     → Retrieve data (no body)
+    POST    → Create new resource (with body)
+    PUT     → Replace entire resource (with body)
+    PATCH   → Partially update resource (with body)
+    DELETE  → Remove resource (no body)
+
+GET vs POST Requests:
+
+    GET Request:
+        - No request body
+        - Data passed in URL query parameters
+        - Readable in browser URL bar
+        - Should be idempotent (safe to repeat)
+        - Caches in browser history
+        - Used: /api/exhibitions?id=5
+    
+    POST Request:
+        - Contains request body with data
+        - Data formatted as JSON (most common)
+        - Not visible in URL
+        - Creates or modifies resources
+        - Not cached
+        - Headers specify content type
+        - Body contains: { "Title": "...", "Description": "..." }
+
+Why POST for Creation:
+    - Secure: Data not in URL
+    - Flexible: Any amount of data in body
+    - Semantic: POST = "create something new"
+    - Server confirms with 201 status code
+
+================================================================================
+2. CHECKING HTTP METHOD IN HANDLERS
+================================================================================
+
+Accessing Request Method:
+    The incoming HTTP request has a Method field:
+    
+    func MyHandler(w http.ResponseWriter, r *http.Request) {
+        method := r.Method
+        // method is a string like "GET", "POST", "PUT", etc.
+    }
+
+Two Ways to Check Method:
+
+Method 1: String Comparison
+    if r.Method == "POST" {
+        // Handle POST
+    } else {
+        // Handle other methods
+    }
+    
+    Pros: Simple, explicit
+    Cons: String matching error-prone
+
+Method 2: Using Constants (Preferred)
+    if r.Method == http.MethodPost {
+        // Handle POST
+    } else if r.Method == http.MethodGet {
+        // Handle GET
+    }
+    
+    Pros: Type-safe, less error-prone
+    Cons: Slightly more verbose
+    
+    Available Constants:
+        http.MethodGet
+        http.MethodPost
+        http.MethodPut
+        http.MethodDelete
+        http.MethodPatch
+        http.MethodHead
+        http.MethodOptions
+
+Complete Handler Example:
+    func Handle(w http.ResponseWriter, r *http.Request) {
+        if r.Method == http.MethodPost {
+            // Handle POST request
+            fmt.Println("POST request received")
+        } else if r.Method == http.MethodGet {
+            // Handle GET request
+            fmt.Println("GET request received")
+        } else {
+            // Reject unsupported methods
+            http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+        }
+    }
+
+================================================================================
+3. DECODING JSON FROM REQUEST BODY
+================================================================================
+
+S23 Recap - Encoding (Server → Client):
+    Data flows OUT of server as JSON:
+        
+        data := data.GetAll()
+        json.NewEncoder(w).Encode(data)  // Writes JSON to response
+    
+    Response body: [{"title":"...","description":"..."},...]
+
+S24 - Decoding (Client → Server):
+    Data flows INTO server as JSON:
+        
+        var newExhibition data.Exhibition
+        json.NewDecoder(r.Body).Decode(&newExhibition)  // Reads JSON from request
+    
+    Request body: {"title":"...","description":"..."}
+
+The Decoder vs Encoder:
+
+    Encoder (output):
+        json.NewEncoder(w).Encode(data)
+        - Takes io.Writer (like ResponseWriter)
+        - Writes to output stream
+        - For sending JSON out
+    
+    Decoder (input):
+        json.NewDecoder(r.Body).Decode(&target)
+        - Takes io.Reader (like Request.Body)
+        - Reads from input stream
+        - For receiving JSON in
+
+Creating Target Variable:
+    Must create variable before decoding:
+        
+        var newExhibition data.Exhibition
+        // At this point, newExhibition has zero values
+        // Title="", Description="", Image="", etc.
+    
+    Pass address to Decoder:
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        // The & operator gets the address
+        // Decoder fills in the fields of newExhibition
+
+Why Address (&) is Needed:
+    Decode() modifies the variable passed to it.
+    To modify a variable, functions need its address:
+        
+        func Decode(target *Exhibition) {
+            target.Title = "Decoded Title"  // Modifying through pointer
+        }
+    
+    Therefore, you must pass &variable, not variable.
+
+Complete Decoding Pattern:
+    func HandlePost(w http.ResponseWriter, r *http.Request) {
+        var newExhibition data.Exhibition
+        
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        if err != nil {
+            http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+        }
+        
+        // newExhibition now contains decoded data
+        fmt.Printf("Received: %+v\n", newExhibition)
+    }
+
+================================================================================
+4. THE APPEND FUNCTION AND SLICES
+================================================================================
+
+How Slices Work in Go:
+    Slices are dynamic arrays. They have:
+        - Pointer to underlying array
+        - Length (current elements)
+        - Capacity (allocated space)
+    
+    Growing a slice requires careful memory management.
+
+The append() Function:
+    Adds element(s) to a slice and returns new slice:
+        
+        slice := []int{1, 2, 3}
+        slice = append(slice, 4)
+        // slice is now [1, 2, 3, 4]
+    
+    Important: append() RETURNS a new slice:
+        
+        // Wrong - ignores returned slice:
+        append(list, newItem)  // ❌
+        
+        // Correct - captures returned slicelist:
+        list = append(list, newItem)  // ✓
+    
+    Multiple Elements:
+        slice = append(slice, 4, 5, 6)  // Add multiple
+    
+    Another Slice:
+        slice = append(slice, otherSlice...)  // Unpack with ...
+
+Practical Pattern for Data Storage:
+    In data/exhibitions.go:
+        
+        package data
+        
+        var list = []Exhibition{
+            // Initial data
+        }
+        
+        func Add(e Exhibition) {
+            list = append(list, e)
+        }
+        
+        func GetAll() []Exhibition {
+            return list
+        }
+    
+    In api/post.go:
+        
+        func HandlePost(w http.ResponseWriter, r *http.Request) {
+            var newExhibition data.Exhibition
+            err := json.NewDecoder(r.Body).Decode(&newExhibition)
+            if err != nil {
+                http.Error(w, "Invalid JSON", http.StatusBadRequest)
+                return
+            }
+            
+            data.Add(newExhibition)  // Add to slice
+            w.WriteHeader(http.StatusCreated)
+            w.Write([]byte("Exhibition created"))
+        }
+
+Important Note:
+    This approach stores data in memory only.
+    When server restarts, all added data is lost.
+    Real applications use databases for persistence.
+
+================================================================================
+5. HTTP STATUS CODES FOR POST
+================================================================================
+
+Status Codes for POST Requests:
+
+    201 Created:
+        Most common for successful creation.
+        Indicates resource was successfully created.
+        Often includes created resource in response.
+        
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(createdResource)
+    
+    202 Accepted:
+        Request received but not yet processed.
+        Used for async operations (background jobs).
+        
+        w.WriteHeader(http.StatusAccepted)
+    
+    204 No Content:
+        Successful but no content to return.
+        Some APIs use this after creation.
+        
+        w.WriteHeader(http.StatusNoContent)
+    
+    400 Bad Request:
+        Malformed JSON or invalid data format.
+        Client error in request format.
+        
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+    
+    405 Method Not Allowed:
+        POST received on GET-only endpoint.
+        Tells client which method to use instead.
+        
+        http.Error(w, "Use POST", http.StatusMethodNotAllowed)
+    
+    409 Conflict:
+        Resource already exists (duplicate).
+        Could occur if ID already in database.
+        
+        http.Error(w, "Exhibition already exists", http.StatusConflict)
+    
+    413 Payload Too Large:
+        JSON body exceeds size limit.
+        May need to limit request size.
+        
+        http.Error(w, "Request too large", http.StatusRequestEntityTooLarge)
+    
+    415 Unsupported Media Type:
+        Content-Type not application/json
+        
+        http.Error(w, "Must be JSON", http.StatusUnsupportedMediaType)
+
+Pattern for 201 Created:
+    func HandlePost(w http.ResponseWriter, r *http.Request) {
+        var newExhibition data.Exhibition
+        
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        if err != nil {
+            http.Error(w, "Invalid JSON", http.StatusBadRequest)
+            return
+        }
+        
+        data.Add(newExhibition)
+        
+        w.WriteHeader(http.StatusCreated)
+        w.Write([]byte("Created successfully"))
+    }
+
+================================================================================
+6. COMPLETE POST HANDLER IMPLEMENTATION
+================================================================================
+
+Full Handler with Validation:
+    func HandlePost(w http.ResponseWriter, r *http.Request) {
+        // 1. Check method first
+        if r.Method != http.MethodPost {
+            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+            return
+        }
+        
+        // 2. Create target variable
+        var newExhibition data.Exhibition
+        
+        // 3. Decode JSON from request body
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        if err != nil {
+            http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+        }
+        
+        // 4. Basic validation
+        if newExhibition.Title == "" {
+            http.Error(w, "Title is required", http.StatusBadRequest)
+            return
+        }
+        
+        // 5. Store the data
+        data.Add(newExhibition)
+        
+        // 6. Return success response
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusCreated)
+        json.NewEncoder(w).Encode(newExhibition)
+    }
+
+Separating GET and POST:
+    In main.go (Go 1.22+):
+        
+        server.HandleFunc("GET /api/exhibitions", api.HandleGet)
+        server.HandleFunc("POST /api/exhibitions", api.HandlePost)
+    
+    In main.go (Pre Go 1.22):
+        
+        server.HandleFunc("/api/exhibitions", api.HandleMixed)
+        
+        // In api handler:
+        func HandleMixed(w http.ResponseWriter, r *http.Request) {
+            if r.Method == http.MethodGet {
+                HandleGet(w, r)
+            } else if r.Method == http.MethodPost {
+                HandlePost(w, r)
+            } else {
+                http.Error(w, "Method not allowed", 
+                          http.StatusMethodNotAllowed)
+            }
+        }
+
+================================================================================
+7. TESTING POST REQUESTS
+================================================================================
+
+Testing Tools:
+
+Postman (Recommended for Testing):
+    1. Open Postman
+    2. Create new request
+    3. Set method to POST
+    4. Enter URL: http://localhost:3335/api/make-exhibition
+    5. Go to "Body" tab
+    6. Select "raw" format
+    7. Select "JSON" from dropdown
+    8. Paste JSON:
+        {
+            "Title": "New Exhibition",
+            "Description": "Amazing new exhibition",
+            "Image": "new.jpg",
+            "Color": "blue",
+            "CurrentlyOpened": true
+        }
+    9. Click "Send"
+    10. See response status 201 Created
+
+curl Command Line:
+    curl -X POST http://localhost:3335/api/make-exhibition \
+      -H "Content-Type: application/json" \
+      -d '{
+        "Title": "New Exhibition",
+        "Description": "Amazing new exhibition",
+        "Image": "new.jpg",
+        "Color": "blue",
+        "CurrentlyOpened": true
+      }'
+
+JavaScript Fetch:
+    fetch('http://localhost:3335/api/make-exhibition', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            Title: 'New Exhibition',
+            Description: 'Amazing new exhibition',
+            Image: 'new.jpg',
+            Color: 'blue',
+            CurrentlyOpened: true
+        })
+    })
+    .then(res => res.json())
+    .then(data => console.log('Created:', data))
+
+Verifying Creation:
+    1. After POST request succeeds (status 201)
+    2. Open GET endpoint in browser:
+        http://localhost:3335/api/get-exhibitions
+    3. See newly created exhibition in response
+    4. Or refresh template page:
+        http://localhost:3335/template
+
+================================================================================
+8. STRUCT TAGS AND JSON MAPPING
+================================================================================
+
+Why Struct Tags Matter:
+    Go struct field names must be capitalized to export them.
+    But JSON keys are typically lowercase.
+    Struct tags tell the JSON decoder the field mappings.
+
+Without Struct Tags:
+    type Exhibition struct {
+        Title       string  // JSON needs "Title" (capital T)
+        Description string  // JSON needs "Description"
+    }
+    
+    JSON must match exactly: {"Title": "...", "Description": "..."}
+    This is awkward and not standard JSON practice.
+
+With Struct Tags:
+    type Exhibition struct {
+        Title       string `json:"title"`
+        Description string `json:"description"`
+        Image       string `json:"image"`
+        Color       string `json:"color"`
+        CurrentlyOpened bool `json:"currentlyOpened"`
+    }
+    
+    JSON can use lowercase: {"title": "...", "description": "..."}
+    Standard REST API practice.
+
+Struct Tag Options:
+    - `json:"fieldName"` → Use this exact field name
+    - `json:"fieldName,omitempty"` → Omit if zero value
+    - `json:"-"` → Never include this field
+    - `json:"fieldName,required"` → Field required (Go 1.23+)
+
+Examples:
+    type Exhibition struct {
+        Title       string `json:"title"`
+        Description string `json:"description"`
+        Image       string `json:"image,omitempty"`
+        ID          int    `json:"-"`  // Never in JSON
+    }
+
+================================================================================
+9. ERROR HANDLING IN POST HANDLERS
+================================================================================
+
+Common POST Errors:
+
+Invalid JSON Format:
+    JSON is malformed, not valid JSON:
+        
+        { "title": "Missing quote }  // Invalid
+        { "title": "Test", }         // Trailing comma
+        
+    Error from Decoder:
+        err := json.NewDecoder(r.Body).Decode(&data)
+        if err != nil {
+            http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+        }
+
+Missing Required Fields:
+    JSON is valid but missing important data:
+        
+        {"image": "photo.jpg"}  // Missing title
+        
+    Check after decoding:
+        if newExhibition.Title == "" {
+            http.Error(w, "Title required", http.StatusBadRequest)
+            return
+        }
+
+Type Mismatches:
+    JSON has wrong type for field:
+        
+        {"title": 123}        // Title should be string
+        {"year": "2024"}      // Year should be number
+        
+    Decoder handles this and returns error.
+
+Error Message Strategy:
+    Generic messages for security:
+        
+        ❌ Bad: "JSON unmarshaling failed: invalid character at line 5"
+        ✓ Good: "Invalid JSON format"
+        ✓ Better: "Invalid request body"
+    
+    Never expose internal error details to client.
+
+Pattern for Robust Handler:
+    func HandlePost(w http.ResponseWriter, r *http.Request) {
+        // Duplicate POST request issue would be here.
+        // We'll handle this in s25 (validation)
+        
+        var newExhibition data.Exhibition
+        
+        // Decode and handle errors
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        if err != nil {
+            http.Error(w, "Invalid request", http.StatusBadRequest)
+            return
+        }
+        
+        // Validate required fields
+        if newExhibition.Title == "" {
+            http.Error(w, "Title is required", http.StatusBadRequest)
+            return
+        }
+        
+        // Store data
+        data.Add(newExhibition)
+        
+        // Return success
+        w.WriteHeader(http.StatusCreated)
+        w.Write([]byte("Created"))
+    }
+
+================================================================================
+10. DATA PERSISTENCE LIMITATION
+================================================================================
+
+Current In-Memory Approach:
+    var list = []Exhibition{...}  // Global slice
+    
+    Issues:
+        - Data lost on server restart
+        - Data not shared between server instances
+        - No backup or recovery
+        - Perfect for prototyping/learning
+        - Not suitable for production
+
+Example Scenario:
+    1. Server starts with 4 exhibitions
+    2. User POSTs new exhibition via Postman
+    3. NewExhibition added to memory
+    4. User views /template - sees 5 exhibitions ✓
+    5. Developer presses Ctrl+C to stop server
+    6. Server restarts
+    7. User views /template - sees only original 4 exhibitions ✗
+    8. The added exhibition is gone
+
+Production Solutions:
+    - Use database (PostgreSQL, MongoDB, etc.)
+    - File-based persistence (JSON file, SQLite)
+    - Cloud storage services
+    - Separate data layer API
+
+================================================================================
+11. COMPLETE WORKING EXAMPLE
+================================================================================
+
+File Structure:
+    s24_apiHandlersForPOST/
+    ├── main.go
+    ├── go.mod
+    ├── api/
+    │   ├── get.go
+    │   └── post.go
+    └── data/
+        └── exhibitions.go
+
+exhibitions.go:
+    package data
+    
+    type Exhibition struct {
+        Title           string `json:"title"`
+        Description     string `json:"description"`
+        Image           string `json:"image"`
+        Color           string `json:"color"`
+        CurrentlyOpened bool   `json:"currentlyOpened"`
+    }
+    
+    var list = []Exhibition{
+        {
+            Title:           "Ancient Greece",
+            Description:     "Ancient Greek artifacts...",
+            Image:           "greece.jpg",
+            Color:           "blue",
+            CurrentlyOpened: true,
+        },
+    }
+    
+    func GetAll() []Exhibition {
+        return list
+    }
+    
+    func Add(e Exhibition) {
+        list = append(list, e)
+    }
+
+get.go:
+    package api
+    
+    import (
+        "encoding/json"
+        "mod24/data"
+        "net/http"
+    )
+    
+    func HandleGet(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+
+post.go:
+    package api
+    
+    import (
+        "encoding/json"
+        "mod24/data"
+        "net/http"
+    )
+    
+    func HandlePost(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+            http.Error(w, "Method not allowed", 
+                      http.StatusMethodNotAllowed)
+            return
+        }
+        
+        var newExhibition data.Exhibition
+        err := json.NewDecoder(r.Body).Decode(&newExhibition)
+        if err != nil {
+            http.Error(w, "Invalid JSON", http.StatusBadRequest)
+            return
+        }
+        
+        data.Add(newExhibition)
+        w.WriteHeader(http.StatusCreated)
+        w.Write([]byte("Created successfully"))
+    }
+
+main.go:
+    func main() {
+        server := http.NewServeMux()
+        
+        server.HandleFunc("GET /api/exhibitions", api.HandleGet)
+        server.HandleFunc("POST /api/exhibitions", api.HandlePost)
+        
+        http.ListenAndServe(":3335", server)
+    }
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. POST requests include body with data to create resources
+2. Check r.Method == http.MethodPost to verify POST requests
+3. Use json.NewDecoder(r.Body).Decode(&target) to decode JSON input
+4. Always pass address (&) when decoding to allow modification
+5. Use append(slice, element) to add to slices, capture returned value
+6. Return 201 StatusCreated for successful creation
+7. Validate data after decoding, before storing
+8. Test POST requests with Postman or curl
+9. Use struct tags `json:"fieldName"` to map JSON to struct fields
+10. In-memory data is lost on server restart; use database for production
+11. Separate GET and POST handlers for clarity
+12. Handle and validate JSON errors before storing data
+13. POST enables dynamic data creation, completing basic CRUD operations
+14. Never expose internal errors; return generic messages to clients
+
+================================================================================

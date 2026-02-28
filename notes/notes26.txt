@@ -1,0 +1,798 @@
+================================================================================
+S26: COMPILING & PACKAGING - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section covers how to compile Go source code into executable binaries
+and package them for distribution. Unlike interpreted languages where source
+code runs through an interpreter, Go is compiled into native machine code for
+the target operating system and architecture. Understanding compilation, the go build
+and go install commands, and the differences between platform-specific binaries
+is essential for deploying Go applications. This is the final step in moving
+from development to production deployment.
+
+Key Topics Covered:
+- What Go compilation does
+- go build command and binary creation
+- go install command and CLI application setup
+- Compiling for different operating systems (Windows, macOS, Linux)
+- Compiling for different architectures (x86_64, ARM, etc.)
+- Environment variables (GOOS, GOARCH) for cross-compilation
+- Binary naming conventions across platforms
+- Handling assets (public folders) in compiled binaries
+- The go:embed directive for embedding assets
+- Packaging executables for distribution
+- Creating installers for different operating systems
+- Difference between compilation and packaging
+- Development workflow (go run vs go build vs go install)
+
+================================================================================
+1. COMPILATION FUNDAMENTALS
+================================================================================
+
+What is Compilation:
+    Process of converting source code to machine code:
+        
+        Go source code (.go files)
+                ↓ (compilation)
+            Executable binary (.exe on Windows, plain binary on Unix)
+                ↓ (execution)
+            Running program with output
+
+Compiled vs Interpreted Languages:
+
+    Interpreted (Python, JavaScript):
+        Source code → Interpreter reads and executes → Output
+        Interpreter must be installed to run code
+        same code runs on different systems unchanged
+    
+    Compiled (Go, C++, Rust):
+        Source code → Compiler produces native binary → Output
+        Binary is native machine code, specific to OS/architecture
+        Each OS/architecture needs separate binary
+
+Go's Compilation Approach:
+    - Fast compilation (seconds even for large projects)
+    - No runtime interpreter needed
+    - Single binary executable
+    - All dependencies included in binary
+    - Binary is self-contained
+    - No "Go runtime" needed on target system
+
+Steps in Go Compilation:
+    1. Read all .go files in package
+    2. Parse and check syntax
+    3. Resolve imports and dependencies
+    4. Type checking
+    5. Optimization
+    6. Code generation for target OS/architecture
+    7. Linking (combining with standard library)
+    8. Output single executable binary
+
+================================================================================
+2. GO BUILD COMMAND
+================================================================================
+
+Basic go build:
+    Command: go build .
+    Effect: Compiles current Go module/package
+    Output: Executable in current directory
+    
+    Example:
+        $ pwd
+        /path/to/project
+        
+        $ go build .
+        
+        $ ls
+        main.go
+        mod26.exe  (Windows)
+        mod26      (macOS/Linux)
+
+Output Naming:
+    Windows: <moduleName>.exe
+        go build . → go/bin/main.exe
+        mod26 → mod26.exe
+    
+    macOS/Linux: <moduleName>
+        go build . → ./main
+        mod26 → mod26
+
+Specifying Output Location with -o:
+    Command: go build . -o <path>
+    Changes output directory/filename
+    
+    Examples:
+        go build . -o ./build/app
+        Creates: build/app (Unix) or build/app.exe (Windows)
+        
+        go build . -o ./dist/museum.exe
+        Creates: dist/museum.exe
+        
+        go build . -o /usr/local/bin/myapp
+        Creates: /usr/local/bin/myapp
+
+Compiling Specific Files:
+    go build filename.go
+    Compiles just that file (not recommended for multi-file projects)
+
+Complete Build Examples:
+    # Default build in current directory
+    go build .
+    
+    # Build and output to specific folder
+    go build . -o build/
+    
+    # Build and output with specific name
+    go build . -o build/museum
+    
+    # Build with custom path
+    go build -o ./bin/myapp .
+
+Build Output Structure:
+    Before build:
+        project/
+        ├── main.go
+        ├── go.mod
+        └── api/
+            └── handler.go
+    
+    After build:
+        project/
+        ├── main.go
+        ├── go.mod
+        ├── api/
+        │   └── handler.go
+        └── main.exe  (Windows) or main (Unix)
+
+================================================================================
+3. GO INSTALL COMMAND
+================================================================================
+
+What go install Does:
+    Compiles code AND installs to system PATH
+    Makes application available globally in terminal
+    Only useful for CLI applications (not web servers typically)
+    Different from go build (which creates local binary)
+
+How go install Works:
+    1. Compiles Go code (like go build)
+    2. Places binary in $GOPATH/bin directory
+    3. $GOPATH/bin is in system PATH
+    4. Can run application from anywhere in terminal
+
+Example Workflow:
+    # While in project directory
+    go install .
+    
+    # Binary is now in $GOPATH/bin
+    # Can run from anywhere:
+    
+    cd ~/Documents
+    mod26          # Runs the installed binary
+    $ Output...
+
+When to Use go install vs go build:
+
+    Use go build When:
+        - Building web servers (run with ./app)
+        - Creating downloadable packages
+        - Building for other systems
+        - Want output in current directory
+        - Deploying to servers
+    
+    Use go install When:
+        - Creating CLI tools
+        - Want global availability in terminal
+        - Personal development tools
+        - Tools you use across projects
+        - Command-line utilities
+
+$GOPATH Variable:
+    Default location: ~/go (Unix) or %USERPROFILE%\go (Windows)
+    
+    Directory structure:
+        go/
+        ├── bin/       ← Where go install places executables
+        ├── src/       ← Not commonly used in Go 1.11+
+        └── pkg/
+    
+    View your $GOPATH:
+        go env GOPATH
+
+Adding to PATH (if not already):
+    Usually $GOPATH/bin is already in PATH.
+    If not, add it:
+        
+        On macOS/Linux:
+            export PATH=$PATH:$(go env GOPATH)/bin
+        
+        On Windows:
+            Add %USERPROFILE%\go\bin to System PATH
+
+Practical CLI Example:
+    Project: todo-cli (command-line todo manager)
+    
+    go install .
+    
+    Can now use anywhere:
+        $ todo add "Buy groceries"
+        $ todo list
+        $ todo complete 1
+
+================================================================================
+4. CROSS-COMPILATION (DIFFERENT OS/ARCHITECTURE)
+================================================================================
+
+Understanding GOOS and GOARCH:
+    GOOS = Go Operating System
+    GOARCH = Go Architecture
+    
+    These environment variables tell go build what target to compile for.
+
+Common Combinations:
+
+    Windows (64-bit):
+        GOOS=windows GOARCH=amd64
+        Output: app.exe
+    
+    macOS (Intel):
+        GOOS=darwin GOARCH=amd64
+        Output: app
+    
+    macOS (Apple Silicon M1/M2):
+        GOOS=darwin GOARCH=arm64
+        Output: app
+    
+    Linux (64-bit):
+        GOOS=linux GOARCH=amd64
+        Output: app
+    
+    Linux (ARM, Raspberry Pi):
+        GOOS=linux GOARCH=arm
+        Output: app
+    
+    Linux (ARM64, modern ARM servers):
+        GOOS=linux GOARCH=arm64
+        Output: app
+
+Cross-Compilation Examples:
+
+    On Mac, build for Windows:
+        GOOS=windows GOARCH=amd64 go build .
+        Creates: main.exe (executable on Windows)
+    
+    On Windows, build for Linux:
+        set GOOS=linux
+        set GOARCH=amd64
+        go build .
+        Creates: main
+    
+    On Linux, build for macOS Intel:
+        GOOS=darwin GOARCH=amd64 go build .
+        Creates: main
+    
+    On Mac Intel, build for Mac M1:
+        GOOS=darwin GOARCH=arm64 go build .
+        Creates: main (for M1/M2 Macs)
+
+Cross-Compilation for Multiple Platforms:
+
+    Build for all common targets:
+        
+        GOOS=windows GOARCH=amd64 go build . -o builds/app_windows.exe
+        GOOS=darwin GOARCH=amd64 go build . -o builds/app_mac.exe
+        GOOS=darwin GOARCH=arm64 go build . -o builds/app_mac_arm.exe
+        GOOS=linux GOARCH=amd64 go build . -o builds/app_linux.exe
+
+Platform Naming Convention:
+    When releasing binaries, use clear naming:
+        
+        appname-windows-amd64.exe
+        appname-darwin-amd64
+        appname-darwin-arm64
+        appname-linux-amd64
+        appname-linux-arm
+
+Bash Script for Building All Platforms:
+    #!/bin/bash
+    
+    PLATFORMS="windows:amd64 darwin:amd64 darwin:arm64 linux:amd64"
+    
+    for platform in $PLATFORMS; do
+        OS="${platform%:*}"
+        ARCH="${platform#*:}"
+        
+        echo "Building for $OS/$ARCH..."
+        GOOS=$OS GOARCH=$ARCH go build . -o "builds/app_${OS}_${ARCH}"
+    done
+
+PowerShell Script (Windows):
+    $platforms = @(
+        @{GOOS="windows"; GOARCH="amd64"; suffix="windows.exe"},
+        @{GOOS="linux"; GOARCH="amd64"; suffix="linux"},
+        @{GOOS="darwin"; GOARCH="amd64"; suffix="mac_intel"},
+        @{GOOS="darwin"; GOARCH="arm64"; suffix="mac_arm"}
+    )
+    
+    foreach ($p in $platforms) {
+        $env:GOOS=$p.GOOS
+        $env:GOARCH=$p.GOARCH
+        go build . -o "builds/app_$($p.suffix)"
+    }
+
+================================================================================
+5. BINARY OUTPUT NAMING
+================================================================================
+
+Windows Binaries:
+    Always have .exe extension:
+        
+        go build .
+        Output: main.exe (if module is main)
+        Output: museum.exe (if module is museum)
+    
+    Even when renaming:
+        go build . -o myapp.exe
+        Creates: myapp.exe
+
+Unix Binaries (macOS, Linux):
+    NO file extension:
+        
+        go build .
+        Output: main (if module is main)
+        Output: museum (if module is museum)
+    
+    No automatic extension:
+        go build . -o myapp
+        Creates: myapp (not myapp.bin, not myapp.sh)
+    
+    Executable permission:
+        Binary is automatically executable (755 permissions)
+        Can run: ./myapp
+
+Determining Module Name:
+    From go.mod:
+        
+        module museum  → Binary named museum
+        module mod26   → Binary named mod26
+        module github.com/user/app → Binary named app
+
+Checking What Binary Will Be Created:
+    Look at go.mod:
+        cat go.mod
+        
+        Output example:
+        module mod26
+        go 1.21
+        
+        → go build . will create mod26.exe (Windows) or mod26 (Unix)
+
+Avoiding Platform-Specific Issues:
+    ✓ Correct: go build . -o app.exe (then app.exe on Windows)
+    ✓ Correct: go build . -o app (then ./app on Unix)
+    ❌ Avoid: go build . -o app.bin (unusual for Go)
+
+================================================================================
+6. ASSETS AND EMBEDDING
+================================================================================
+
+The Asset Problem:
+    Go binaries are single files containing only compiled code.
+    Static files (CSS, images, HTML) are NOT embedded by default:
+        
+        project/
+        ├── museum (binary)
+        ├── public/  (NOT included in binary)
+        │   ├── css/
+        │   ├── images/
+        │   └── style.css
+        └── template/
+
+When Binary Runs:
+    Binary and public folder must be in same directory:
+        
+        ./museum (binary)
+        ./public/  (required at runtime)
+        
+        If you move binary:
+            /elsewhere/museum  (binary)
+            /elsewhere/public/ (must also move!)
+    
+    If public/ is missing:
+        http.FileServer(http.Dir("./public"))
+        Returns 404 errors for all static files
+
+Deployment Issue:
+    Problem: Distributing binary + asset folders
+    Solution 1: Ship as archive (zip/tar) with all files
+    Solution 2: Embed assets in binary
+
+Embedding Assets with go:embed:
+
+    Basic File Embedding:
+        import _ "embed"
+        
+        //go:embed public/style.css
+        var cssContent string
+        
+        // Can now use cssContent without file system
+    
+    Directory Embedding (Go 1.16+):
+        import (
+            "embed"
+            "net/http"
+        )
+        
+        //go:embed public/*
+        var publicFS embed.FS
+        
+        // In handler:
+        server.Handle("/", http.FileServer(http.FS(publicFS)))
+
+Advantages of go:embed:
+    - Single binary with all assets
+    - No separate file distribution needed
+    - Assets can't be deleted accidentally
+    - Slightly faster file serving
+    - More secure (files can't be modified)
+
+Disadvantages of go:embed:
+    - Larger binary size
+    - Must recompile to change assets
+    - More complex code
+
+When to Use go:embed:
+    ✓ Use: CLI tools with UI
+    ✓ Use: Standalone executables
+    ❌ Skip: Web servers with frequently changed assets
+    ❌ Skip: Large static file collections
+
+Current State Without Embedding:
+    Follow deployment instructions:
+    1. Copy binary
+    2. Copy public/ directory
+    3. Copy template/ directory
+    4. Run binary in directory with these files
+
+================================================================================
+7. PACKAGING FOR DISTRIBUTION
+================================================================================
+
+Difference: Compilation vs Packaging:
+    Compilation:
+        Source code → Binary executable (go build)
+        Creates one runnable file
+    
+    Packaging:
+        Binary + assets → Distributable package (zip, installer, DMG)
+        Makes installation easy for end users
+        Platform-specific format
+
+Go's Role Ends at Compilation:
+    Go creates the .exe or binary file.
+    Packaging is YOUR responsibility.
+    Different for each operating system:
+        
+        Windows: Create .msi installer or .zip
+        macOS: Create .dmg installer or .app package
+        Linux: Create .rpm, .deb, or tar.gz
+
+Types of Packages:
+
+    Windows:
+        .exe standalone: Just the binary, no installer
+        .zip: Binary + script + documentation
+        .msi: Professional installer (requires WIX Toolset)
+        .exe installer: Nsis/InstallShield generated installer
+    
+    macOS:
+        Binary: Just the executable
+        .zip: Binary + docs
+        .dmg: Professional disk image with installer
+        .app: Full application bundle
+        .pkg: macOS installer package (pkgbuild)
+    
+    Linux:
+        Binary: Just the executable
+        .tar.gz: Compressed archive
+        .deb: Debian package (Ubuntu, Debian)
+        .rpm: RedHat package (Fedora, CentOS)
+
+Simple Packaging Approach:
+
+    Windows:
+        1. go build . -o myapp.exe
+        2. Create myapp_windows_1.0.zip containing:
+            - myapp.exe
+            - README.txt
+            - LICENSE
+            - public/ (if needed)
+        3. Ship myapp_windows_1.0.zip
+
+    macOS:
+        1. go build . -o myapp
+        2. Create myapp_macos_1.0.tar.gz containing:
+            - myapp
+            - README.txt
+            - LICENSE
+            - public/ (if needed)
+        3. Ship myapp_macos_1.0.tar.gz
+
+    Linux:
+        1. go build . -o myapp
+        2. Create myapp_linux_1.0.tar.gz
+        3. Ship myapp_linux_1.0.tar.gz
+
+Professional Packaging Tools:
+
+    Windows Installer (NSIS):
+        - Free and open source
+        - Creates professional .exe installer
+        - Handles installation to Program Files
+        - Adds to Start Menu
+        - Uninstaller support
+    
+    macOS Installer (pkgbuild):
+        - Built into macOS
+        - Creates .pkg installer
+        - Professional distribution method
+        - Handles permissions/code signing
+    
+    Linux (fpm - Effing Package Manager):
+        - Single tool for multiple package types
+        - Converts tar.gz to .deb or .rpm
+        - Consistent installation across linuxes
+
+Deployment Platforms:
+
+    Self-hosted:
+        1. Build binary for target platform
+        2. Create installer/package
+        3. Host on website
+        4. Users download and install
+
+    Cloud Platforms:
+        Heroku:
+            - go build happens automatically
+            - Binary run with runtime
+        
+        AWS EC2:
+            - Build for Linux
+            - Copy binary to instance
+            - Run directly
+        
+        Docker Container:
+            - Go binary inside container
+            - Single platform binary needed
+            - Container handles platform abstraction
+
+================================================================================
+8. DEVELOPMENT WORKFLOW
+================================================================================
+
+Development Cycle:
+
+    During Development (active coding):
+        go run .
+        - Compiles and runs in one step
+        - Shows output immediately
+        - Changes require restart
+        - Fast feedback loop
+    
+    Testing (local binary):
+        go build .
+        ./app
+        - Tests actual binary
+        - More like production
+        - Can distribute to others
+        - Check file dependencies
+    
+    Final Release:
+        go build . -o builds/
+        Cross-compile for all platforms:
+            - Windows binary
+            - macOS binary (both Intel and ARM)
+            - Linux binary
+        - Package for each platform
+        - Version and release
+
+Common Workflow:
+
+    Phase 1 - Active Development:
+        $ go run .     # During coding
+        $ go run .     # After changes
+        $ go run .     # Testing changes
+
+    Phase 2 - Testing Binary:
+        $ go build .
+        $ ./app        # Test that it works as binary
+        $ ./app --help # Check CLI help works
+
+    Phase 3 - Cross-compile:
+        $ GOOS=windows GOARCH=amd64 go build . -o builds/app_windows.exe
+        $ GOOS=linux GOARCH=amd64 go build . -o builds/app_linux.exe
+        $ GOOS=darwin GOARCH=amd64 go build . -o builds/app_mac.exe
+        $ GOOS=darwin GOARCH=arm64 go build . -o builds/app_mac_arm.exe
+
+    Phase 4 - Test Cross-compiled Binaries:
+        - Test Windows binary on Windows machine
+        - Test Linux binary on Linux machine
+        - Or use Docker for cross-platform testing
+
+    Phase 5 - Package:
+        - Create Windows installer
+        - Create macOS .dmg
+        - Create Linux tar.gz
+
+    Phase 6 - Release:
+        - Upload to GitHub releases
+        - Upload to website
+        - Announce version
+
+Build Script Example (Makefile):
+    .PHONY: build build-all clean run
+    
+    BINARY_NAME=museum
+    VERSION=1.0.0
+    
+    build:
+        go build . -o ${BINARY_NAME}
+    
+    build-all:
+        GOOS=windows GOARCH=amd64 go build . -o builds/${BINARY_NAME}_${VERSION}_windows.exe
+        GOOS=linux GOARCH=amd64 go build . -o builds/${BINARY_NAME}_${VERSION}_linux
+        GOOS=darwin GOARCH=amd64 go build . -o builds/${BINARY_NAME}_${VERSION}_mac_intel
+        GOOS=darwin GOARCH=arm64 go build . -o builds/${BINARY_NAME}_${VERSION}_mac_arm
+    
+    run:
+        go run .
+    
+    clean:
+        go clean
+        rm -rf builds/
+
+================================================================================
+9. COMMON ISSUES AND SOLUTIONS
+================================================================================
+
+Issue: "command not found" after go install
+
+Solution:
+    Verify $GOPATH/bin is in PATH:
+        echo $PATH
+        
+        Should include: /home/user/go/bin or /usr/local/go/bin
+        
+        If missing, add to shell profile:
+        On macOS/Linux:
+            echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
+            source ~/.bashrc
+
+Issue: Binary works in current directory, fails elsewhere
+
+Cause:
+    Public folder not in path when running from elsewhere
+    
+Solution:
+    Option 1: Use absolute paths in code
+    Option 2: Embed assets with go:embed
+    Option 3: Ship with required folders
+
+Issue: Wrong architecture binary created
+
+Cause:
+    GOOS/GOARCH environment variables not set correctly
+    
+Solution:
+    Set correctly before building:
+        GOOS=windows GOARCH=amd64 go build .
+        
+    Verify with `go env`:
+        go env GOOS GOARCH
+
+Issue: Binary much larger than expected
+
+Cause:
+    Embedded assets are large
+    All dependencies included
+    No optimization flags used
+    
+Partial Solution:
+    Use -ldflags with go build:
+        go build . -ldflags "-s -w"
+        
+        -s: Omit symbol table
+        -w: Omit debugging information
+        
+        Reduces size but removes debugging
+
+Issue: macOS .app not working
+
+Solution:
+    Creating .app requires additional structure
+    Binary alone not sufficient
+    Need Info.plist, Resources, etc.
+    Use Platypus (macOS) or similar tools
+    Or use professional packaging tools
+
+================================================================================
+10. COMPLETE WORKFLOW EXAMPLE
+================================================================================
+
+Project: museum API server
+
+File Structure:
+    museum/
+    ├── main.go
+    ├── go.mod (module: museum)
+    ├── go.sum
+    ├── api/
+    ├── data/
+    ├── public/ (CSS, images)
+    └── template/
+
+Step 1 - Development:
+    go run .
+    Browser: http://localhost:3335
+
+Step 2 - Local Binary:
+    go build .
+    Creates: museum.exe (Windows) or museum (Unix)
+
+Step 3 - Cross-compile:
+    mkdir builds
+    
+    GOOS=windows GOARCH=amd64 go build . -o builds/museum_windows_1.0.exe
+    GOOS=darwin GOARCH=amd64 go build . -o builds/museum_mac_intel_1.0
+    GOOS=darwin GOARCH=arm64 go build . -o builds/museum_mac_arm_1.0
+    GOOS=linux GOARCH=amd64 go build . -o builds/museum_linux_1.0
+
+Step 4 - Package:
+    # Windows
+    zip -r builds/museum_windows_1.0.zip builds/museum_windows_1.0.exe public/ template/
+    
+    # macOS Intel
+    tar -czf builds/museum_mac_intel_1.0.tar.gz \
+        builds/museum_mac_intel_1.0 public/ template/
+    
+    # Linux
+    tar -czf builds/museum_linux_1.0.tar.gz \
+        builds/museum_linux_1.0 public/ template/
+
+Step 5 - Test:
+    Extract each package on target OS
+    Run binary:
+        Windows: .\museum.exe
+        Unix: ./museum
+    
+    Verify:
+        http://localhost:3335
+        API works
+        Assets serve correctly
+
+Step 6 - Release:
+    Upload packages to GitHub releases
+    Announce version
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. go build compiles source to native binary for target OS/architecture
+2. Binaries are self-contained (except static assets)
+3. Use go build for creating executables
+4. Use go install for system-wide CLI tools
+5. Cross-compile with GOOS and GOARCH environment variables
+6. Always test final binary, not just go run
+7. Windows binaries need .exe extension; Unix don't
+8. Static assets not embedded by default; use separate folders
+9. go:embed directive embeds assets at compile time
+10. Packaging is separate from compilation
+11. Create platform-specific distributions (Windows installer, tar.gz, etc.)
+12. Use build scripts/Makefiles for complex builds
+13. Development: go run | Testing: go build | Release: cross-compile + package
+14. $GOPATH/bin must be in PATH for go install binaries
+15. Different OSes need different binaries; cross-compilation enables single machine to build all
+
+================================================================================

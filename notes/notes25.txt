@@ -1,0 +1,984 @@
+================================================================================
+S25: FRAMEWORKS & EXTERNAL LIBRARIES - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+While previous sections built HTTP APIs using vanilla Go's standard library
+(net/http package), this section introduces external frameworks and libraries
+that simplify web development. The Gin Web Framework is explored as a practical
+example of how third-party libraries can reduce boilerplate code, provide
+utility functions, and handle common tasks like routing, validation, CORS
+headers, and context management. This section demonstrates the balance between
+Go's philosophy of simplicity and the practical benefits of frameworks, while
+teaching dependency management through go.mod and the go get command.
+
+Key Topics Covered:
+- External libraries vs standard library
+- Go package management with go.mod
+- The go get command for installing dependencies
+- Dependency resolution and versioning
+- Direct vs indirect dependencies
+- The Gin Web Framework and its advantages
+- Simplified routing with Gin
+- Context objects vs raw Request/ResponseWriter
+- Utility functions (c.JSON, c.TXT, etc.)
+- CORS header handling
+- Comparison: vanilla Go vs Gin
+- When to use frameworks vs standard library
+- Popular Go web frameworks overview
+- Managing dependencies efficiently
+- Security considerations with external libraries
+
+================================================================================
+1. STANDARD LIBRARY VS EXTERNAL FRAMEWORKS
+================================================================================
+
+Go's Philosophy:
+    "A little copying is better than a little dependency."
+    - Rob Pike
+    
+    Go standard library (net/http) is:
+    - Complete and usable
+    - Minimal dependencies
+    - Battle-tested
+    - No external requirements
+    
+    But it requires:
+    - Manual method checking
+    - Manual JSON encoding/decoding
+    - Manual error handling
+    - Manual routing logic
+    - Manual CORS headers
+
+Example: POST Endpoint
+
+    Vanilla Go (S24):
+        func HandlePost(w http.ResponseWriter, r *http.Request) {
+            if r.Method != http.MethodPost {
+                http.Error(w, "Method not allowed", 
+                          http.StatusMethodNotAllowed)
+                return
+            }
+            
+            var newExhibition data.Exhibition
+            err := json.NewDecoder(r.Body).Decode(&newExhibition)
+            if err != nil {
+                http.Error(w, "Invalid JSON", http.StatusBadRequest)
+                return
+            }
+            
+            // Validate
+            if newExhibition.Title == "" {
+                http.Error(w, "Title required", http.StatusBadRequest)
+                return
+            }
+            
+            data.Add(newExhibition)
+            w.WriteHeader(http.StatusCreated)
+            json.NewEncoder(w).Encode(newExhibition)
+        }
+    
+    Lines of code: ~25
+
+    Gin Framework:
+        r.POST("/exhibitions", func(c *gin.Context) {
+            var exhibition data.Exhibition
+            if err := c.BindJSON(&exhibition); err != nil {
+                c.JSON(http.StatusBadRequest, gin.H{
+                    "error": "Invalid JSON"})
+                return
+            }
+            
+            data.Add(exhibition)
+            c.JSON(http.StatusCreated, exhibition)
+        })
+    
+    Lines of code: ~12
+
+Benefits of Frameworks:
+    ✓ Less boilerplate code
+    ✓ Built-in routing with method filtering
+    ✓ Automatic JSON marshaling/unmarshaling
+    ✓ Context helper methods
+    ✓ Middleware support
+    ✓ Validation helpers
+    ✓ CORS, logging, compression built-in
+    ✓ Better error handling patterns
+    ✓ Faster development
+
+Trade-offs:
+    ✗ External dependency
+    ✗ Larger binary size
+    ✗ Learning curve (framework-specific APIs)
+    ✗ Upstream changes/bugs
+    ✗ Less control over behavior
+    ✗ Security: must trust external code
+
+When to Use Each:
+
+    Use Standard Library When:
+    - Small projects (1-10 handlers)
+    - Specific control needed
+    - Minimal dependencies critical
+    - Learning Go internals
+    - Embedded systems (small binary)
+    - APIs with simple routing
+    
+    Use Framework When:
+    - Large applications (50+ routes)
+    - Complex validation needed
+    - CORS, authentication needed
+    - Fast development important
+    - Team familiar with framework
+    - Enterprise applications
+
+================================================================================
+2. GO PACKAGE MANAGEMENT - GO MOD
+================================================================================
+
+What is go.mod:
+    File that declares Go project's module and dependencies.
+    Similar to: package.json (Node), requirements.txt (Python), pom.xml (Java)
+    
+    Location: Root of project
+    Must exist for: Any project with external dependencies
+
+Structure of go.mod:
+
+    module mod25              // Module name (unique identifier)
+    go 1.25.6                 // Go version
+    
+    require (                 // Direct dependencies
+        github.com/gin-gonic/gin v1.12.0
+    )
+    
+    require (                 // Indirect dependencies (auto-added)
+        github.com/bytedance/sonic v1.15.0     // indirect
+        github.com/go-playground/validator/v10 v10.30.1
+        // ... many more
+    )
+
+Key Fields Explained:
+
+    module <path>:
+        Unique identifier for your project.
+        Usually based on repository: github.com/username/projectname
+        
+        Example:
+            module github.com/firtman/go-fundamentals
+            module github.com/user/museum-api
+    
+    go <version>:
+        Minimum Go version this project requires.
+        Not enforced strictly, but documents requirements.
+        Example: go 1.21 (indicates features from 1.21+)
+    
+    require <path> <version>:
+        Direct dependency - you explicitly imported it
+        Version format: v1.12.0 (major.minor.patch)
+    
+    // indirect:
+        Indirect dependency - dependency of your dependencies
+        Automatically managed
+
+Version Format (Semantic Versioning):
+    
+    v1.12.0
+    │ │  │
+    │ │  └─ Patch (bug fixes): 0→1 is backwards compatible
+    │ └──── Minor (new features): 12→13 is backwards compatible
+    └────── Major (breaking changes): 1→2 may break code
+
+Creating go.mod:
+
+    Automatic:
+        go mod init github.com/user/project
+        Creates with just module declaration
+        First import/go get adds dependencies
+    
+    Manual:
+        Create go.mod file and start using imports
+        go mod tidy automatically updates it
+
+================================================================================
+3. INSTALLING EXTERNAL LIBRARIES WITH GO GET
+================================================================================
+
+The go get Command:
+    Downloads and installs external packages
+    Updates go.mod with dependency
+    Similar to: npm install, pip install, cargo add
+
+Basic Syntax:
+    go get <package-path>
+    go get <package-path>@<version>
+
+Examples:
+
+    Latest version:
+        go get github.com/gin-gonic/gin
+    
+    Specific version:
+        go get github.com/gin-gonic/gin@v1.12.0
+    
+    With -u flag (update):
+        go get -u github.com/gin-gonic/gin
+        Gets latest version within major version
+    
+    Multiple packages:
+        go get github.com/gin-gonic/gin github.com/go-sql-driver/mysql
+
+Installing Gin:
+    
+    Command:
+        go get -u github.com/gin-gonic/gin
+    
+    What happens:
+        1. Downloads Gin and all dependencies
+        2. Stores in $GOPATH/pkg/mod directory
+        3. Updates go.mod with requirement
+        4. Creates/updates go.sum file
+    
+    Output:
+        $ go get -u github.com/gin-gonic/gin
+        go: downloading github.com/gin-gonic/gin v1.12.0
+        go: added github.com/gin-gonic/gin v1.12.0
+        go: added github.com/bytedance/sonic v1.15.0
+        ... (many more dependencies)
+
+go get Flags:
+
+    -u:     Update to latest minor/patch version
+    -t:     Include test dependencies
+    -d:     Download only, don't compile
+    @latest: Explicit latest version
+    @main:  Latest development version
+    
+    Examples:
+        go get -u github.com/gin-gonic/gin           # Latest compatible
+        go get github.com/gin-gonic/gin@latest       # Explicit latest
+        go get -u ./...                              # Update all in project
+
+Updating Dependencies:
+
+    Check for updates:
+        go get -u github.com/gin-gonic/gin
+    
+    Update to specific version:
+        go get github.com/gin-gonic/gin@v1.13.0
+    
+    Downgrade:
+        go get github.com/gin-gonic/gin@v1.11.0
+    
+    Update all:
+        go get -u ./...
+
+Cleanup with go mod tidy:
+    
+    Command:
+        go mod tidy
+    
+    What it does:
+        - Removes unused dependencies
+        - Downloads missing dependencies
+        - Updates go.mod and go.sum
+    
+    Should run:
+        - After manual edits to go.mod
+        - After removing code that used dependencies
+        - Before committing
+
+================================================================================
+4. GO.SUM FILE - DEPENDENCY VERIFICATION
+================================================================================
+
+What is go.sum:
+    Checksums for all dependencies
+    Ensures downloaded code hasn't been tampered with
+    Created automatically by go get
+    Similar to: package-lock.json (Node.js)
+
+go.sum Contents:
+
+    github.com/gin-gonic/gin v1.12.0 h1:X...Y
+    github.com/gin-gonic/gin v1.12.0/go.mod h1:A...B
+    github.com/bytedance/sonic v1.15.0 h1:Q...R
+    github.com/bytedance/sonic v1.15.0/go.mod h1:U...V
+    ... (one line per dependency)
+
+Format:
+    <package> <version> h1:<hash>
+    <package> <version>/go.mod h1:<hash>
+    
+    h1: = v1 of hash (SHA-256)
+    hash = cryptographic fingerprint of code
+
+Why go.sum Matters:
+    Security:
+        Prevents man-in-the-middle attacks
+        Detects if package was modified
+    
+    Reproducibility:
+        Everyone gets exact same versions
+        Builds are consistent
+    
+    Integrity:
+        Checksum mismatch = download failed
+        Build fails rather than using corrupted code
+
+Never Edit go.sum Manually:
+    go get and go mod tidy manage it automatically
+    Editing by hand defeats security purpose
+
+================================================================================
+5. THE GIN WEB FRAMEWORK
+================================================================================
+
+What is Gin:
+    Fast, lightweight HTTP web framework for Go
+    Written in pure Go (no C bindings needed)
+    Similar to: Express.js (Node), Flask (Python), Sinatra (Ruby)
+    Popular in Go community
+    Used in production by large companies
+
+Gin Features:
+    ✓ Fast HTTP router
+    ✓ Built-in middleware support
+    ✓ Automatic method routing (GET, POST, etc.)
+    ✓ JSON/XML marshaling
+    ✓ Parameter validation
+    ✓ Error handling
+    ✓ Request logging
+    ✓ Static file serving
+    ✓ HTML template rendering
+    ✓ Large ecosystem of middleware
+
+Installation:
+    go get -u github.com/gin-gonic/gin
+
+Basic Hello World:
+    package main
+    
+    import (
+        "github.com/gin-gonic/gin"
+        "net/http"
+    )
+    
+    func main() {
+        r := gin.Default()
+        
+        r.GET("/hello", func(c *gin.Context) {
+            c.JSON(http.StatusOK, gin.H{
+                "message": "Hello, World!",
+            })
+        })
+        
+        r.Run() // Starts server on :8080
+    }
+
+Breaking Down the Code:
+
+    gin.Default():
+        Creates a Gin router with default middleware
+        Includes logger, panic recovery
+        Returns router for adding routes
+    
+    r.GET("/hello", handler):
+        Registers route for GET /hello
+        Handler only called for GET requests
+        Eliminates need for method checking
+    
+    func(c *gin.Context):
+        Handler function receives Context
+        Context wraps Request and ResponseWriter
+        Has helper methods for responses
+    
+    gin.H{...}:
+        Shorthand for map[string]interface{}
+        Makes JSON response easy to construct
+        Equivalent to: map[string]interface{}{"message": "..."}
+    
+    c.JSON(statusCode, data):
+        Marshals data to JSON
+        Sets Content-Type to application/json
+        Writes response
+    
+    r.Run():
+        Starts HTTP server
+        Default port :8080
+        Blocks forever (hangs thread)
+
+================================================================================
+6. GIN CONTEXT OBJECT
+================================================================================
+
+Request vs Response vs Context:
+
+    Vanilla Go:
+        func handler(w http.ResponseWriter, r *http.Request)
+        w: ResponseWriter (separate object for writing response)
+        r: *http.Request (pointer to request)
+        Must use both objects
+    
+    Gin:
+        func handler(c *gin.Context)
+        c: Single context containing both request and response
+        Access request and response through context
+        More convenient
+
+Context Advantages:
+    ✓ Single parameter instead of two
+    ✓ Helper methods for common tasks
+    ✓ Middleware-friendly (pass context through chain)
+    ✓ Values storage (per-request data)
+    ✓ Error handling built-in
+
+Accessing Request Data:
+
+    Query Parameters (URL params):
+        name := c.Query("name")          // Get or empty string
+        limit, _ := c.GetQuery("limit")  // Get or boolean
+        params := c.QueryMap("sort")     // Get multiple
+    
+    URL Parameters (path params):
+        id := c.Param("id")              // From /users/:id
+        user := c.Param("user")          // From /users/:user
+    
+    JSON Body:
+        var data Exhibition
+        c.BindJSON(&data)                // Parse and validate
+        c.ShouldBindJSON(&data)          // Parse, return error
+    
+    Headers:
+        token := c.GetHeader("Authorization")
+        contentType := c.ContentType()
+    
+    Raw Request (when needed):
+        originalRequest := c.Request
+    
+    Remote IP:
+        ip := c.ClientIP()
+        remoteAddr := c.RemoteIP()
+
+Writing Responses:
+
+    JSON:
+        c.JSON(http.StatusOK, gin.H{"key": "value"})
+    
+    String:
+        c.String(http.StatusOK, "Hello %s", name)
+    
+    HTML:
+        c.HTML(http.StatusOK, "template.html", data)
+    
+    XML:
+        c.XML(http.StatusOK, gin.H{"key": "value"})
+    
+    Redirect:
+        c.Redirect(http.StatusMovedPermanently, "/new-url")
+    
+    Error:
+        c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+            "error": "Invalid input"})
+
+Example: Complete Handler
+
+    r.POST("/exhibitions", func(c *gin.Context) {
+        // Get JSON body
+        var newExhibition Exhibition
+        if err := c.ShouldBindJSON(&newExhibition); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{
+                "error": err.Error()})
+            return
+        }
+        
+        // Get query parameter
+        source := c.DefaultQuery("source", "unknown")
+        
+        // Get path parameter
+        userID := c.Param("userID")
+        
+        // Get header
+        token := c.GetHeader("X-Auth-Token")
+        
+        // Your logic
+        data.Add(newExhibition)
+        
+        // Response
+        c.JSON(http.StatusCreated, newExhibition)
+    })
+
+================================================================================
+7. ROUTING IN GIN
+================================================================================
+
+HTTP Methods:
+    Gin has methods for each HTTP method:
+        
+        r.GET("/path", handler)
+        r.POST("/path", handler)
+        r.PUT("/path", handler)
+        r.PATCH("/path", handler)
+        r.DELETE("/path", handler)
+        r.HEAD("/path", handler)
+        r.OPTIONS("/path", handler)
+        r.Any("/path", handler)         // Accepts all methods
+
+Basic Routes:
+
+    Simple GET:
+        r.GET("/hello", func(c *gin.Context) {
+            c.JSON(200, gin.H{"msg": "Hello"})
+        })
+    
+    With path parameter:
+        r.GET("/users/:id", func(c *gin.Context) {
+            id := c.Param("id")
+            c.JSON(200, gin.H{"id": id})
+        })
+    
+    Multiple path parameters:
+        r.GET("/users/:userID/posts/:postID", func(c *gin.Context) {
+            userID := c.Param("userID")
+            postID := c.Param("postID")
+            c.JSON(200, gin.H{"user": userID, "post": postID})
+        })
+    
+    With query parameters:
+        r.GET("/search", func(c *gin.Context) {
+            q := c.Query("q")
+            limit := c.DefaultQuery("limit", "10")
+            c.JSON(200, gin.H{"query": q, "limit": limit})
+        })
+
+Path Parameter Syntax:
+    
+    :paramName matches one segment:
+        /users/:id      matches /users/123 or /users/alice
+        NOT /users/123/posts (extra segment not matched)
+    
+    *param matches rest of path:
+        /files/*path    matches /files/a/b/c/file.txt
+        c.Param("path") = "a/b/c/file.txt"
+
+Grouped Routes:
+    
+    Organize routes by prefix:
+        
+        api := r.Group("/api")
+        {
+            api.GET("/exhibitions", handleGetExhibitions)
+            api.POST("/exhibitions", handlePostExhibitions)
+        }
+        
+        Results in:
+            GET /api/exhibitions
+            POST /api/exhibitions
+    
+    Nested groups:
+        v1 := r.Group("/api/v1")
+        {
+            users := v1.Group("/users")
+            {
+                users.GET("/", handleGetUsers)
+                users.POST("/", handleCreateUser)
+            }
+        }
+
+Comparison with Vanilla Go:
+    
+    Vanilla (requires manual method checking):
+        server.HandleFunc("/users/", func(w http.ResponseWriter, 
+                                          r *http.Request) {
+            if r.Method == http.MethodGet {
+                // Handle GET
+            } else if r.Method == http.MethodPost {
+                // Handle POST
+            } else {
+                http.Error(w, "Method not allowed", 405)
+            }
+        })
+    
+    Gin (method built-in):
+        r.GET("/users/", handleGetUsers)
+        r.POST("/users/", handleCreateUsers)
+
+================================================================================
+8. CORS - CROSS-ORIGIN RESOURCE SHARING
+================================================================================
+
+What is CORS:
+    Browser security feature preventing cross-origin requests
+    "Origin" = scheme + domain + port
+    
+    Same origin:
+        http://example.com:80
+        http://example.com:80/api/data
+        Different paths: SAME origin
+    
+    Different origins:
+        http://example.com
+        https://example.com      (different scheme)
+        http://example.com:81    (different port)
+        http://other-site.com    (different domain)
+
+CORS Problem:
+
+    Without CORS headers:
+        Browser blocks request:
+            fetch('https://api.example.com/data')
+                .catch(err)  // Blocked by browser
+    
+    Browser sees:
+        - Request made to different origin
+        - Response lacks CORS headers
+        - Browser blocks response (even if server sent it)
+
+CORS Headers:
+
+    Required Header:
+        Access-Control-Allow-Origin: https://frontend.example.com
+    
+    Other Common Headers:
+        Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+        Access-Control-Allow-Headers: Content-Type, Authorization
+        Access-Control-Allow-Credentials: true
+        Access-Control-Max-Age: 3600
+
+Vanilla Go CORS:
+    
+    Manually add headers:
+        func handleAPI(w http.ResponseWriter, r *http.Request) {
+            w.Header().Set("Access-Control-Allow-Origin", "*")
+            w.Header().Set("Access-Control-Allow-Methods", 
+                          "GET, POST, PUT, DELETE")
+            w.Header().Set("Access-Control-Allow-Headers", 
+                          "Content-Type")
+            
+            // Handler logic
+        }
+    
+    Repetitive for every handler
+
+Gin CORS with Middleware:
+    
+    Simple approach:
+        r.Use(func(c *gin.Context) {
+            c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+            c.Writer.Header().Set("Access-Control-Allow-Methods", 
+                                 "GET, POST, PUT, DELETE")
+            c.Writer.Header().Set("Access-Control-Allow-Headers", 
+                                 "Content-Type")
+            
+            c.Next()
+        })
+    
+    Or use middleware package:
+        import "github.com/gin-contrib/cors"
+        
+        r.Use(cors.Default())  // All origins allowed
+        
+        // Or custom config
+        r.Use(cors.New(cors.Config{
+            AllowOrigins: []string{"https://example.com"},
+            AllowMethods: []string{"GET", "POST"},
+        }))
+
+Benefits of Frameworks for CORS:
+    ✗ Vanilla: Manually add to every handler
+    ✓ Gin: Single middleware applies to all routes
+
+================================================================================
+9. DEPENDENCY MANAGEMENT BEST PRACTICES
+================================================================================
+
+Minimizing Dependency Count:
+    
+    ✓ Good: Only add necessary dependencies
+    ✗ Bad: Add library for one function
+    
+    Ask before go get:
+    - Do I really need this?
+    - Can standard library do it?
+    - Is it well-maintained?
+    - Does it have security issues?
+
+Checking for Security Issues:
+
+    Command:
+        go list -u -m all
+        Shows outdated packages
+        
+        go get -u github.com/xxx
+        Updates to latest
+    
+    Better: Use tools
+        nancy (checks vulnerabilities)
+        govulncheck (built-in from Go 1.21)
+        
+        govulncheck ./...
+        Shows known vulnerabilities
+
+Version Pinning:
+    
+    Why pin versions:
+        - Consistency across developers
+        - Reproducibility
+        - Predictability
+    
+    go.mod pins automatically:
+        require github.com/gin-gonic/gin v1.12.0
+        (exact version specified)
+    
+    Docker example:
+        go.mod locks versions
+        go.sum verifies checksums
+        Result: Same versions everywhere
+
+Updating Strategy:
+
+    Regular Updates:
+        go get -u ./...
+        In CI/CD pipeline weekly or monthly
+    
+    Security Updates:
+        go list -u -m all
+        Apply security patches immediately
+    
+    Major Version Changes:
+        Breaking changes
+        Test thoroughly before upgrading
+        May require code changes
+
+Avoiding Bloat:
+    
+    Remove unused dependencies:
+        go mod tidy
+        Removes imports not in code
+    
+    Analyze dependency tree:
+        go mod graph
+        Shows all dependencies and their dependencies
+    
+    Check binary size:
+        go build . -o app
+        ls -lh app
+        Framework adds ~15-20MB to binary
+
+================================================================================
+10. POPULAR GO WEB FRAMEWORKS
+================================================================================
+
+Gin (Fast, Simple):
+    Features: Fast routing, middleware, JSON support
+    Use case: REST APIs, microservices
+    Learning curve: Easy
+    Performance: Excellent
+    GitHub: github.com/gin-gonic/gin
+
+Echo (Lightweight):
+    Features: Minimal dependencies, middleware, validation
+    Use case: REST APIs, web services
+    Learning curve: Easy
+    Performance: Very good
+    GitHub: github.com/labstack/echo
+
+Fiber (Express-like):
+    Features: Express.js-like API, fast
+    Use case: High-performance APIs
+    Learning curve: Very easy (if Express familiar)
+    Performance: Excellent
+    Note: Uses fasthttp instead of net/http
+
+Chi (Simple Composable):
+    Features: Composable middleware, net/http compatible
+    Use case: Production APIs
+    Learning curve: Easy
+    Performance: Good
+
+Beego:
+    Features: Full-stack framework (routing, ORM, templates)
+    Use case: Full web applications
+    Learning curve: Moderate
+    Performance: Good
+
+Gorilla Mux:
+    Features: Advanced routing, middleware
+    Use case: Web applications, APIs
+    Learning curve: Moderate
+    Performance: Good
+
+Choosing a Framework:
+
+    For Learning:
+        ✓ Gin or Echo (simple, common)
+        ✓ Chi (pure net/http)
+    
+    For Production:
+        ✓ Gin, Echo, or Fiber (battle-tested)
+        ✓ Chi (if minimal dependencies critical)
+    
+    For Speed:
+        ✓ Fiber (fastest)
+        ✓ Gin (close second)
+    
+    For Control:
+        ✓ Chi (net/http based)
+        ✓ Standard library (most control)
+
+================================================================================
+11. WHEN NOT TO USE FRAMEWORKS
+================================================================================
+
+Keep Vanilla Go When:
+
+    Single Handler:
+        One simple GET endpoint
+        Framework overhead not worth it
+    
+    Specific Control Needed:
+        Custom request handling
+        Unusual routing patterns
+        Framework opinionated approach limits you
+    
+    Minimum Dependencies:
+        Embedded systems
+        Docker image size critical
+        Air-gapped deployment
+    
+    Learning Go:
+        Understanding http.Handler interface
+        Understanding middleware patterns
+        Building framework from scratch
+
+Example: Simple Health Check:
+
+    Vanilla (preferred):
+        http.HandleFunc("/health", func(w http.ResponseWriter, 
+                                        r *http.Request) {
+            w.WriteHeader(http.StatusOK)
+            w.Write([]byte("OK"))
+        })
+    
+    Framework (overkill):
+        r.GET("/health", func(c *gin.Context) {
+            c.JSON(http.StatusOK, gin.H{"status": "OK"})
+        })
+
+Example: Middleware Handling
+
+    Vanilla (requires manual implementation):
+        func logging(h http.Handler) http.Handler {
+            return http.HandlerFunc(func(w http.ResponseWriter, 
+                                         r *http.Request) {
+                log.Println(r.Method, r.URL)
+                h.ServeHTTP(w, r)
+            })
+        }
+    
+    Gin (built-in):
+        r.Use(gin.Logger())
+
+================================================================================
+12. COMPLETE GIN EXAMPLE
+================================================================================
+
+Full Museum API with Gin:
+
+    package main
+    
+    import (
+        "github.com/gin-gonic/gin"
+        "github.com/gin-contrib/cors"
+        "net/http"
+    )
+    
+    type Exhibition struct {
+        ID          int    `json:"id"`
+        Title       string `json:"title"`
+        Description string `json:"description"`
+        Image       string `json:"image"`
+    }
+    
+    var exhibitions []Exhibition
+    var nextID = 1
+    
+    func main() {
+        r := gin.Default()
+        
+        // CORS middleware
+        r.Use(cors.Default())
+        
+        // Routes
+        r.GET("/api/exhibitions", getExhibitions)
+        r.GET("/api/exhibitions/:id", getExhibition)
+        r.POST("/api/exhibitions", createExhibition)
+        
+        r.Run(":8080")  // Port 8080
+    }
+    
+    func getExhibitions(c *gin.Context) {
+        c.JSON(http.StatusOK, exhibitions)
+    }
+    
+    func getExhibition(c *gin.Context) {
+        id := c.Param("id")
+        // Find and return
+        for _, e := range exhibitions {
+            if e.ID == parseID(id) {
+                c.JSON(http.StatusOK, e)
+                return
+            }
+        }
+        c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+    }
+    
+    func createExhibition(c *gin.Context) {
+        var e Exhibition
+        if err := c.ShouldBindJSON(&e); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
+        
+        e.ID = nextID
+        nextID++
+        exhibitions = append(exhibitions, e)
+        
+        c.JSON(http.StatusCreated, e)
+    }
+    
+    func parseID(s string) int {
+        // Simple parse (production: use strconv)
+        id := 0
+        return id
+    }
+
+Comparison: Lines of Code
+
+    Vanilla Go: ~150 lines (method checking, JSON handling, error handling)
+    Gin: ~80 lines (framework handles repetitive tasks)
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. Go standard library (net/http) is complete but requires boilerplate
+2. External frameworks reduce code but add dependencies
+3. go.mod manages dependencies and versions
+4. go get downloads and installs external packages
+5. go.sum verifies package integrity via checksums
+6. Gin Web Framework simplifies HTTP API development
+7. Context object wraps request and response for convenience
+8. Routing is simpler in frameworks (method built-in)
+9. Middleware support makes cross-cutting concerns easier
+10. CORS headers automatically handled by Gin and middleware
+11. Every dependency has trade-offs: convenience vs control/size
+12. Choose between vanilla and framework based on project needs
+13. Update dependencies regularly for security
+14. Popular frameworks: Gin, Echo, Fiber, Chi, Beego
+15. Frameworks are optional; vanilla Go is fully capable
+16. Don't add frameworks for single-handler applications
+17. Frameworks best for complex routing and middleware scenarios
+18. Dependency verification via govulncheck prevents security issues
+
+================================================================================
