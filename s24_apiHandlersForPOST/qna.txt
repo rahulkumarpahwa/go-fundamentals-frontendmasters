@@ -1,0 +1,17 @@
+What HTTP method can be used to check the type of request in a handler function?
+Use request.Method or constants like http.MethodPost to check the HTTP method type
+
+How do you add a new element to a slice in Go?
+Use the append() function, which returns a new slice. Assign the result back to the original slice, like: list = append(list, newElement)
+
+How can you decode JSON input in a Go HTTP handler?
+Use json.NewDecoder() with the request body, and call the Decode() method on a target variable, passing its address with &
+
+What HTTP status code is typically used when a new resource is successfully created?
+HTTP status code 201 (StatusCreated) is used to indicate a successful resource creation
+
+What method should be used when passing a variable to a function that needs to modify its value?
+Pass the address of the variable using the ampersand (&) operator to allow the function to modify the original variable
+
+What method is used to convert an error to a string in Go?
+error.Error()

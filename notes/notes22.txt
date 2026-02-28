@@ -1,0 +1,317 @@
+================================================================================
+S22: TEMPLATE LOOPING AND CONDITIONAL HTML - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section builds on s21 by demonstrating how to loop through collections of
+data in templates and apply conditional logic to generate dynamic HTML. Instead
+of using a single struct, we pass entire slices to templates and use the 'range'
+keyword to iterate over collections. Additionally, conditional logic (if-else)
+is used dynamically apply CSS classes and styles based on struct properties.
+This pattern is fundamental to building dynamic web interfaces with server-side
+rendering.
+
+Key Topics Covered:
+- Passing slices to templates instead of single structs
+- Using 'range' to loop through collections in templates
+- The dot (.) reference in loops pointing to current items
+- Conditional logic in templates (if-else statements)
+- Dynamically applying CSS classes based on conditions
+- Inline styling with template expressions
+- Whitespace trimming in template declarations (hyphen syntax)
+- Server-side rendering with data-driven HTML
+- Template caching vs static file serving
+- Browser cache management during development
+
+================================================================================
+1. LOOPING COLLECTIONS WITH RANGE
+================================================================================
+
+S21 vs S22 Approach:
+    S21: Pass single struct from slice
+        html.Execute(w, data.GetAll()[0])  // Only first item
+        In template: {{ .Title }}
+    
+    S22: Pass entire slice of structs
+        html.Execute(w, data.GetAll())     // All items
+        In template: Use range to loop all
+
+The 'range' Keyword:
+    Go templates use 'range' instead of for loops. The dot (.) refers to the
+    current item being iterated over.
+    
+    Syntax:
+        {{ range . }}
+            <!-- Here . refers to each struct in the slice -->
+            <article>
+                <h2>{{ .Title }}</h2>
+                <p>{{ .Description }}</p>
+                <img src="/gallery/{{ .Image }}" />
+            </article>
+        {{ end }}
+
+Understanding the Dot in Loops:
+    - Outer scope: {{ . }} = entire slice passed to Execute()
+    - Inside {{ range . }}: {{ . }} = current struct in iteration
+    - Can access properties: {{ .Title }}, {{ .Description }}, {{ .Image }}
+    - The dot shifts context as you enter nested blocks
+
+Basic Loop Example:
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Error"))
+            return
+        }
+        html.Execute(w, data.GetAll())  // Send entire slice
+    }
+    
+    Template:
+        {{ range . }}
+        <article>
+            <h2>{{ .Title }}</h2>
+            <p>{{ .Description }}</p>
+            <img src="/gallery/{{ .Image }}" />
+        </article>
+        {{ end }}
+
+================================================================================
+2. CONDITIONAL LOGIC IN TEMPLATES
+================================================================================
+
+Adding Conditional Properties to Structs:
+    Before using if-else in templates, add boolean properties to Exhibition:
+    
+    type Exhibition struct {
+        Title           string
+        Description     string
+        Image           string
+        Color           string      // New: for border styling
+        CurrentlyOpened bool        // New: for conditional classes
+    }
+    
+    Update struct literals:
+        {
+            Title:           "Life in Ancient Greek",
+            Description:     "...",
+            Image:           "ancient-greece.png",
+            Color:           "red",
+            CurrentlyOpened: true,
+        }
+
+If-Else Conditional Syntax:
+    {{ if .Condition }}
+        <!-- HTML if condition is true -->
+    {{ else }}
+        <!-- HTML if condition is false -->
+    {{ end }}
+
+Practical Example - Dynamic CSS Classes:
+    <article class="{{ if .CurrentlyOpened }}opened{{ else }}closed{{ end }}">
+        <h2>{{ .Title }}</h2>
+    </article>
+    
+    When CurrentlyOpened = true:
+        Output: <article class="opened">
+    
+    When CurrentlyOpened = false:
+        Output: <article class="closed">
+
+Combining Styling and Conditionals:
+    <article 
+        style="border: 5px solid {{ .Color }}"
+        class="{{ if .CurrentlyOpened }}opened{{ else }}closed{{ end }}">
+        <h2>{{ .Title }}</h2>
+        <p>{{ .Description }}</p>
+        <img src="/gallery/{{ .Image }}" />
+    </article>
+
+================================================================================
+3. WHITESPACE TRIMMING WITH HYPHEN SYNTAX
+================================================================================
+
+The Problem - Unwanted Spaces in Output:
+    When you write:
+        <article class="{{ if .CurrentlyOpened }}opened{{ else }}closed{{ end }}">
+    
+    The template engine preserves whitespace, resulting in:
+        <article class=" opened ">  <!-- Extra spaces around value -->
+    
+    This can break CSS matching or create messy HTML source code.
+
+The Solution - Hyphen Trimming:
+    Add a hyphen (-) inside the braces to trim whitespace:
+    
+    {{ - expression - }}
+        Removes whitespace before AND after the expression.
+    
+    {{ - expression }}
+        Removes whitespace before the expression.
+    
+    {{ expression - }}
+        Removes whitespace after the expression.
+
+Practical Example:
+    Before trimming:
+        <article class="{{if .CurrentlyOpened}}opened{{else}}closed{{end}}">
+        Output: <article class="opened">    <!-- spaces around "opened" -->
+    
+    After trimming:
+        <article class="{{- if .CurrentlyOpened -}}opened{{- else -}}closed{{- end -}}">
+        Output: <article class="opened">   <!-- no spaces -->
+
+Multiple Lines with Trimming:
+    You can format your template nicely while trimming spaces:
+    
+    <article style="border: 5px solid {{ .Color }}"
+             class="{{- if .CurrentlyOpened -}}
+                      opened
+                    {{- else -}}
+                      closed
+                    {{- end -}}">
+
+================================================================================
+4. DYNAMIC STYLING WITH TEMPLATE EXPRESSIONS
+================================================================================
+
+Inline Style Attributes:
+    Use template expressions directly in style attributes:
+    
+    <article style="border: 5px solid {{ .Color }}">
+    
+    When Color = "red":
+        Output: <article style="border: 5px solid red">
+    
+    When Color = "blue":
+        Output: <article style="border: 5px solid blue">
+
+Complex Styling Examples:
+    background-color: {{ .BackgroundColor }};
+    border-color: {{ .BorderColor }};
+    opacity: {{ .Opacity }};  // If Opacity is a number like "0.5"
+
+Important Notes on Style Attributes:
+    - Template expressions work seamlessly in inline styles
+    - The Go template engine doesn't validate CSS, so invalid values can slip through
+    - No special syntax needed (unlike HTML attributes with hyphen trimming)
+    - Ensure struct properties contain valid CSS values
+
+================================================================================
+5. FILE SERVING AND TEMPLATE CACHING
+================================================================================
+
+Important Development Behavior:
+
+Static Files (CSS, Images, JavaScript):
+    - Served once and cached by browser
+    - File Server Change: Must restart server to pick up changes
+    - Browser Cache: May need to clear browser cache
+    
+    Setup file server:
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+
+Templates:
+    - Re-parsed on every request (not cached by server)
+    - Template File Change: No server restart needed
+    - Browser Cache: Clear cache if changes don't appear
+    - Code change in Go: Server restart required
+
+Practical Workflow:
+    1. Modify template file → Refresh browser (may clear cache)
+    2. Modify CSS file → Restart server AND refresh browser
+    3. Modify Go code → Restart server AND refresh browser
+
+Key Differences:
+    Templates are read fresh each request in development.
+    File servers use HTTP caching headers (files cached by browser).
+    This asymmetry can be confusing during development.
+
+================================================================================
+6. COMMON ISSUES AND SOLUTIONS
+================================================================================
+
+Issue: CSS class changes not appearing in browser
+Solution 1: Clear browser cache (Ctrl+Shift+Delete)
+Solution 2: Hard refresh (Ctrl+F5)
+Solution 3: Check template syntax and trimming
+
+Issue: Extra spaces in generated HTML classes preventing CSS matching
+Solution: Use hyphen trimming ({{- }} and {{ -}})
+
+Issue: Template loops not displaying
+Solution A: Verify data.GetAll() returns non-empty slice
+Solution B: Check that {{ range . }} loops over entire data
+Solution C: Verify struct property names match template expressions
+
+Issue: Styles not applying
+Solution A: Check syntax: {{ .PropertyName }} not {{ .PropertyName() }}
+Solution B: Verify property values are valid CSS
+Solution C: Clear browser cache
+
+Issue: Need to restart server after template change
+Solution: Templates are re-parsed on each request. If restart needed,
+          likely changed Go code, not just template.
+
+================================================================================
+7. COMPLETE WORKING PATTERNS
+================================================================================
+
+Full Handler Pattern:
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/template.tmpl")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Error"))
+            return
+        }
+        html.Execute(w, data.GetAll())
+    }
+
+Full Struct Pattern:
+    type Exhibition struct {
+        Title           string
+        Description     string
+        Image           string
+        Color           string
+        CurrentlyOpened bool
+    }
+
+Full Template Pattern:
+    {{ range . }}
+    <article style="border: 5px solid {{ .Color }}"
+             class="{{- if .CurrentlyOpened -}}opened{{- else -}}closed{{- end -}}">
+        <h2>{{ .Title }}</h2>
+        <p>{{ .Description }}</p>
+        <img src="/gallery/{{ .Image }}" />
+    </article>
+    {{ end }}
+
+Full Main Pattern:
+    func main() {
+        server := http.NewServeMux()
+        server.HandleFunc("/template", handleTemplate)
+        
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+        
+        http.ListenAndServe(":3333", server)
+    }
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. Use 'range' to loop collections in templates
+2. Dot (.) shifts context - inside range, it refers to current item
+3. If-else conditionals work directly in templates
+4. Hyphen syntax trims unwanted whitespace from output
+5. Template expressions work in both HTML attributes and style declarations
+6. Templates refresh automatically; static files may need server restart
+7. Always check browser cache during development
+8. Server-side rendering generates complete HTML before sending to client
+9. Dynamic classes and styles enable rich user interfaces without JavaScript
+10. This pattern is the foundation for content management systems
+
+================================================================================

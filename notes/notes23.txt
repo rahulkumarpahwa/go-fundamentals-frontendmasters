@@ -1,0 +1,554 @@
+================================================================================
+S23: API HANDLERS FOR GET - COMPREHENSIVE NOTES
+================================================================================
+
+OVERVIEW:
+This section introduces building RESTful APIs with vanilla Go (no libraries).
+We shift from template-based server-side rendering to API-based client-server
+communication using JSON. The focus is on implementing the GET operation for
+RESTful APIs that return JSON data instead of HTML. This pattern is essential
+for building modern web applications where the client (JavaScript frontend or
+mobile app) requests data and the server responds with JSON.
+
+Key Topics Covered:
+- Creating API packages and handlers
+- HTTP GET request handling
+- Query parameters in URL requests
+- Converting strings to integers (strconv.Atoi)
+- JSON encoding and marshaling
+- Setting content-type headers for JSON responses
+- Returning JSON directly to HTTP responses
+- Error handling in API handlers
+- Using json.NewEncoder() for streaming JSON output
+- RESTful endpoint naming conventions
+- Separating API logic into dedicated packages
+- Testing API endpoints with browser or curl
+
+================================================================================
+1. FROM SERVER-SIDE RENDERING TO API ENDPOINTS
+================================================================================
+
+Previous Approach (S22 - Server-Side Rendering):
+    - Server generates complete HTML for each request
+    - Server sends rendered HTML to browser
+    - Browser displays HTML directly
+    - All formatting happens on server
+    
+    Handler:
+        func handleTemplate(w http.ResponseWriter, r *http.Request) {
+            html, err := template.ParseFiles("./template/template.tmpl")
+            if err != nil {
+                return
+            }
+            html.Execute(w, data.GetAll())  // Sends HTML with data embedded
+        }
+    
+    Response: Complete HTML document
+
+New Approach (S23 - API):
+    - Server provides data endpoints
+    - Server responds with JSON data (not HTML)
+    - Client receives JSON and processes/displays it
+    - Client can be web browser, mobile app, or another service
+    
+    Handler:
+        func handleGetExhibitions(w http.ResponseWriter, r *http.Request) {
+            w.Header().Set("Content-Type", "application/json")
+            json.NewEncoder(w).Encode(data.GetAll())
+        }
+    
+    Response: JSON array of exhibitions
+
+Benefits of API Approach:
+    - Same data can serve web, mobile, and desktop clients
+    - Client can process and display data as needed
+    - Separation of concerns (backend data, frontend presentation)
+    - Enables real-time updates via JavaScript on client
+    - Scales better for many different client types
+    - Enables AJAX calls (fetching data without page reload)
+
+================================================================================
+2. PROJECT STRUCTURE - API PACKAGE
+================================================================================
+
+Creating the API Package:
+    Directory structure:
+        s23_apiHandlersForGET/
+        ├── main.go
+        ├── go.mod
+        ├── api/
+        │   ├── get.go
+        │   └── post.go  (for future)
+        ├── data/
+        │   └── exhibitions.go
+        ├── public/
+        │   └── ...
+        └── template/
+            └── index.template
+
+api/get.go - Primary API handler:
+    package api
+    
+    import (
+        "encoding/json"
+        "mod23/data"
+        "net/http"
+    )
+    
+    func Get(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+
+Registering the API endpoint in main.go:
+    func main() {
+        server := http.NewServeMux()
+        
+        server.HandleFunc("/api/exhibitions", api.Get)
+        
+        server.HandleFunc("/template", handleTemplate)
+        
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+        
+        http.ListenAndServe(":3334", server)
+    }
+
+Package Organization Benefits:
+    - api/ package contains all API handlers
+    - data/ package contains data structures and access
+    - Clear separation of concerns
+    - Easy to add more endpoints (POST, PUT, DELETE) later
+    - Scales to large applications
+
+================================================================================
+3. SETTING CONTENT-TYPE HEADERS
+================================================================================
+
+Why Content-Type Matters:
+    The Content-Type header tells the client what format the response is in.
+    Without it, browsers may not parse JSON correctly.
+    APIs typically use "application/json" for JSON responses.
+
+Setting Headers in Go:
+    Syntax: w.Header().Set("HeaderName", "Value")
+    
+    Must be called BEFORE writing response body:
+        func Get(w http.ResponseWriter, r *http.Request) {
+            w.Header().Set("Content-Type", "application/json")  // First
+            json.NewEncoder(w).Encode(data)                      // Then
+        }
+    
+    If you write body first, the header call has no effect.
+
+Common Content-Type Values:
+    - "application/json" → JSON data
+    - "text/html" → HTML document
+    - "text/plain" → Plain text
+    - "application/javascript" → JavaScript code
+    - "text/css" → CSS stylesheet
+    - "image/jpeg" → JPEG image
+
+Example Handler with Headers:
+    func Get(w http.ResponseWriter, r *http.Request) {
+        // Set header first
+        w.Header().Set("Content-Type", "application/json")
+        
+        // Write response body
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+
+================================================================================
+4. JSON ENCODING APPROACHES
+================================================================================
+
+Method 1: json.Marshal() with Write()
+    Converts to string first, then writes:
+    
+    jsonBytes, err := json.Marshal(data)
+    if err != nil {
+        http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
+        return
+    }
+    w.Write(jsonBytes)
+    
+    Pros: Simple, complete control
+    Cons: Creates intermediate string in memory
+
+Method 2: json.NewEncoder() - Preferred for HTTP
+    Streams JSON directly to response writer:
+    
+    w.Header().Set("Content-Type", "application/json")
+    err := json.NewEncoder(w).Encode(data)
+    if err != nil {
+        // Log or handle error
+    }
+    
+    Pros: Memory efficient, recommended for HTTP
+    Cons: Slightly more verbose
+
+Complete Handler with Error Handling:
+    func Get(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        
+        exhibitions := data.GetAll()
+        
+        err := json.NewEncoder(w).Encode(exhibitions)
+        if err != nil {
+            fmt.Println("Error encoding JSON:", err)
+            // Note: Can't set status here, headers already sent
+        }
+    }
+
+Why json.NewEncoder() is Preferred:
+    - No intermediate string allocation
+    - Better for large responses
+    - Streams data efficient
+    - HTTP standard practice
+    - Works with io.Writer interface
+
+================================================================================
+5. HANDLING QUERY PARAMETERS
+================================================================================
+
+URL Structure with Query Parameters:
+    /api/exhibitions?id=5&limit=10
+    
+    Base URL: /api/exhibitions
+    Query string: id=5&limit=10
+    Parameters: id="5", limit="10"
+
+Retrieving Query Parameters:
+    Syntax: r.URL.Query().Get("parameterName")
+    
+    Example:
+        func Get(w http.ResponseWriter, r *http.Request) {
+            idStr := r.URL.Query().Get("id")
+            limitStr := r.URL.Query().Get("limit")
+            
+            // At this point, idStr and limitStr are strings
+        }
+
+Converting String Parameters to Integers:
+    Use strconv.Atoi() (ASCII to Integer):
+    
+    import "strconv"
+    
+    idStr := r.URL.Query().Get("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        http.Error(w, "Invalid ID", http.StatusBadRequest)
+        return
+    }
+    
+    // Now 'id' is an integer type
+
+Example: Get Specific Exhibition by ID:
+    func GetByID(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        
+        idStr := r.URL.Query().Get("id")
+        id, err := strconv.Atoi(idStr)
+        if err != nil {
+            http.Error(w, "Invalid ID parameter", http.StatusBadRequest)
+            return
+        }
+        
+        exhibition := data.GetByID(id)
+        if exhibition == nil {
+            http.Error(w, "Exhibition not found", http.StatusNotFound)
+            return
+        }
+        
+        json.NewEncoder(w).Encode(exhibition)
+    }
+
+Query Parameter Behavior:
+    - Query().Get() always returns string
+    - If parameter not provided, returns empty string ""
+    - Query().Get() never returns error (use strconv.Atoi for validation)
+    - Multiple values for same parameter return data.Values (advanced)
+
+Client Usage Examples:
+    Browser: http://localhost:3334/api/exhibitions?id=2
+    curl: curl "http://localhost:3334/api/exhibitions?id=2"
+    JavaScript: fetch("/api/exhibitions?id=2")
+
+================================================================================
+6. HTTP STATUS CODES AND ERROR RESPONSES
+================================================================================
+
+Common HTTP Status Codes:
+    200 OK → Success, data returned
+    201 Created → Success, resource created
+    400 Bad Request → Client error (invalid parameters)
+    404 Not Found → Resource not found
+    500 Internal Server Error → Server error
+    503 Service Unavailable → Server overloaded
+
+Using http.Error():
+    Quick way to return error responses:
+    
+    http.Error(w, "error message", statusCode)
+    
+    Examples:
+        http.Error(w, "Invalid ID parameter", http.StatusBadRequest)
+        http.Error(w, "Exhibition not found", http.StatusNotFound)
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+
+Error Response Behavior:
+    - Sets status code automatically
+    - Writes plain text error message to body
+    - Sets Content-Type to "text/plain"
+
+Complete Error Handling Pattern:
+    func GetByID(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        
+        idStr := r.URL.Query().Get("id")
+        if idStr == "" {
+            http.Error(w, "ID parameter required", http.StatusBadRequest)
+            return
+        }
+        
+        id, err := strconv.Atoi(idStr)
+        if err != nil {
+            http.Error(w, "ID must be a number", http.StatusBadRequest)
+            return
+        }
+        
+        exhibition := data.GetByID(id)
+        if exhibition == nil {
+            http.Error(w, "Exhibition not found", http.StatusNotFound)
+            return
+        }
+        
+        json.NewEncoder(w).Encode(exhibition)
+    }
+
+================================================================================
+7. KEY QUERY PARAMETER FACTS
+================================================================================
+
+Important Behavior:
+    All query parameters are ALWAYS returned as slices by http protocol.
+    Even if only one value provided, it's technically a slice with one element.
+    
+    Query().Get() "unpacks" this for convenience:
+        r.URL.Query().Get("id")     // Returns first value as string
+        r.URL.Query()["id"]         // Returns []string with all values
+    
+    Example - Multiple values:
+        URL: /api/search?tag=go&tag=web&tag=backend
+        
+        r.URL.Query().Get("tag")    // Returns "go" (first value)
+        r.URL.Query()["tag"]        // Returns []string{"go", "web", "backend"}
+
+Why Slices?
+    HTTP protocol allows multiple values for same parameter.
+    Example use case: checkboxes in HTML forms
+    Query().Get() is convenient for single-value case
+
+================================================================================
+8. COMPLETE WORKING EXAMPLES
+================================================================================
+
+File: api/get.go - Get All Exhibitions
+    package api
+    
+    import (
+        "encoding/json"
+        "mod23/data"
+        "net/http"
+    )
+    
+    func Get(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+
+File: api/get.go - Get Single Exhibition (Extension)
+    package api
+    
+    import (
+        "encoding/json"
+        "fmt"
+        "mod23/data"
+        "net/http"
+        "strconv"
+    )
+    
+    func Get(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+    
+    func GetByID(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        
+        idStr := r.URL.Query().Get("id")
+        id, err := strconv.Atoi(idStr)
+        if err != nil {
+            http.Error(w, "Invalid ID", http.StatusBadRequest)
+            return
+        }
+        
+        exhibition := data.GetByID(id)
+        if exhibition == nil {
+            http.Error(w, "Exhibition not found", http.StatusNotFound)
+            return
+        }
+        
+        json.NewEncoder(w).Encode(exhibition)
+    }
+
+File: main.go - Registration
+    func main() {
+        server := http.NewServeMux()
+        
+        fs := http.FileServer(http.Dir("./public"))
+        server.Handle("/", fs)
+        
+        server.HandleFunc("/template", handleTemplate)
+        
+        server.HandleFunc("/api/exhibitions", api.Get)
+        // server.HandleFunc("/api/exhibitions/detail", api.GetByID)  // For future
+        
+        err := http.ListenAndServe(":3334", server)
+        if err != nil {
+            fmt.Println(err)
+        }
+    }
+
+Testing the API:
+    In browser:
+        http://localhost:3334/api/exhibitions
+    
+    Response: JSON array of all exhibitions
+
+================================================================================
+9. TRANSITIONING FROM TEMPLATE TO API
+================================================================================
+
+Full Pattern Comparison:
+
+Template Server-Side (S22):
+    1. Handler receives request
+    2. Loads template file
+    3. Queries database/data
+    4. Renders HTML with data embedded
+    5. Sends complete HTML to browser
+    6. Browser displays HTML
+
+API Server (S23):
+    1. Handler receives request
+    2. Queries database/data
+    3. Encodes data as JSON
+    4. Sends JSON to client
+    5. Client receives JSON
+    6. Client renders with JavaScript (or template on client)
+
+Code Comparison:
+
+Template Handler:
+    func handleTemplate(w http.ResponseWriter, r *http.Request) {
+        html, err := template.ParseFiles("./template/index.template")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            w.Write([]byte("Internal Server Error"))
+            return
+        }
+        err = html.Execute(w, data.GetAll())
+        if err != nil {
+            fmt.Println("Error executing template:", err)
+        }
+    }
+
+API Handler:
+    func Get(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data.GetAll())
+    }
+
+Key Differences:
+    - API handlers are much simpler
+    - No template files needed
+    - No need to check template parsing errors
+    - Sends pure data, not formatted HTML
+    - Client responsible for display logic
+
+================================================================================
+10. COMMON ISSUES AND SOLUTIONS
+================================================================================
+
+Issue: JSON not displaying in browser or curl
+Solution: Verify Content-Type header is set to "application/json"
+
+Issue: Query parameter not working
+Solution A: Check syntax: r.URL.Query().Get("paramName")
+Solution B: Verify all parts of URL: base path + ? + paramName=value
+
+Issue: String to integer conversion errors
+Solution: Use error checking on strconv.Atoi()
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        http.Error(w, "Invalid ID", http.StatusBadRequest)
+        return
+    }
+
+Issue: API handler registered but not working
+Solution A: Verify handler registered in main: server.HandleFunc("/path", handler)
+Solution B: Try exact path in browser/curl
+Solution C: Check spelling of path
+
+Issue: CORS errors in browser when calling from JavaScript
+Solution: Will be covered in later sections (CORS headers)
+
+================================================================================
+11. NEXT STEPS FOR API DEVELOPMENT
+================================================================================
+
+By mastering GET, you're ready to implement:
+
+POST Requests:
+    - Create new resources
+    - Extract JSON from request body
+    - Store in database
+    - Return created resource with ID
+
+Additional RESTful Operations:
+    - PUT: Update existing resource
+    - DELETE: Remove resource
+    - PATCH: Partial update
+
+Database Integration:
+    - Replace data.GetAll() with database queries
+    - Implement persistence
+    - Add indexing for performance
+
+API Improvements:
+    - Request validation
+    - CORS handling
+    - Rate limiting
+    - Authentication/Authorization
+    - API documentation
+    - Logging and monitoring
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. APIs return data (JSON) instead of rendered HTML
+2. Use json.NewEncoder() for streaming JSON to HTTP responses
+3. Always set Content-Type header to "application/json"
+4. Query parameters are always strings; use strconv.Atoi() to convert
+5. Query().Get() returns empty string if parameter not provided
+6. Use http.Error() for error responses with proper status codes
+7. Separate API handlers into dedicated api/ package
+8. Status codes communicate request outcome (200, 400, 404, 500, etc.)
+9. Same API can serve web, mobile, and desktop clients
+10. APIs enable separation of backend data from frontend presentation
+11. Vanilla Go makes building APIs simple without extra libraries
+12. This pattern scales to complex REST APIs with databases and authentication
+
+================================================================================
