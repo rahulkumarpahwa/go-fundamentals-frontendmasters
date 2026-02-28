@@ -1,9 +1,9 @@
 package data
 
 type Exhibition struct {
-	Title       string
-	Description string
-	Image       string
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Image       string `json:"image"`
 }
 
 var list = []Exhibition{ // Remember this is the constructor of a slice of exhibition.The constructor angle is always curly braces, soit's not actually a square brackets as an array in JSON, a reminder.We have the type first and then we open curly braces, andthat's the constructor of types in Go.

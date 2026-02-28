@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"mod21/data"
 	"net/http"
+	"os"
 )
 
 func handleTemplate(w http.ResponseWriter, r *http.Request) {
@@ -18,13 +20,35 @@ func handleTemplate(w http.ResponseWriter, r *http.Request) {
 	html.Execute(w, data.GetAll()[0])
 }
 
+func handleJsonTemplate(w http.ResponseWriter, r *http.Request) {
+	slicebytes, err := os.ReadFile("./public/gallery/data.json")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	var exhibitionData []data.Exhibition
+	err = json.Unmarshal(slicebytes, &exhibitionData)
+	if err != nil {
+		fmt.Println("Unmarshal error:", err.Error())
+	}
+	fmt.Println(exhibitionData)
+
+	html, err := template.ParseFiles("./template/template.tmpl")
+	if err != nil {
+		fmt.Println("template error:", err.Error())
+	}
+
+	html.Execute(w, exhibitionData[2])
+}
+
 func main() {
 	server := http.NewServeMux()
 
-	server.HandleFunc("/template", handleTemplate)
-
 	fs := http.FileServer(http.Dir("./public"))
 	server.Handle("/", fs)
+
+	server.HandleFunc("/template", handleTemplate)          // default it should be below the "/" route
+	server.HandleFunc("/json-template", handleJsonTemplate) // way 1: solving self.
 
 	err := http.ListenAndServe(":1999", server)
 	if err != nil {
@@ -40,9 +64,9 @@ func main() {
 
 // way 1:
 // if you go in the public folder, in gallery we have data.json,that's the JSON. We could read the JSON and use our marshal solutions to have it back, that's one option.We can do that because we have already been playing with JSON.
-// (we will do self here only again at new route "/json".)
-
-
+// (we will do self here only again at new route "/json-template".)
+// so, here we will first read the whole file has we need the data in the []byte to get is unmarshalled to the slice of struct. also, the struct need to have the defined with comments which will tell what property to match with what when get the data parsed.
+// then we will just the parse the template again and this time pass the data from the struct just created from the second index struct not the 0 index to check it is working or not.
 
 // way 2:
 // We can just create like static for now, structure in Go with that information.
