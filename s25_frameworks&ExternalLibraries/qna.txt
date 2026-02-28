@@ -1,0 +1,18 @@
+What are the key advantages of using the Gin Web Framework in Go?
+Gin Web Framework simplifies API development by reducing manual code, providing utility functions for JSON and text responses, allowing direct method filtering when hooking handlers, and offering a context object that contains request and response details.
+
+How do you add an external library in a Go project?
+To add an external library in Go: 1) Run 'go get' with the library's URL in the terminal, 2) The dependency is automatically added to go.mod, 3) Import the library in your code using an import statement, 4) Use the library's functions and methods directly.
+
+What is the purpose of Cross-Origin Resource Sharing (CORS) headers in web APIs?
+CORS headers are a JavaScript security restriction that allows web browsers to make requests to a different domain than the one serving the web page, preventing unauthorized cross-origin access and potential security vulnerabilities.
+
+How does Gin Web Framework handle request routing differently from manual API implementation?
+In Gin, routing is simplified by directly specifying HTTP methods and URLs when defining handlers, eliminating the need for manual method checking and request parsing. The framework provides a context object with built-in methods for handling requests and responses.
+
+How can you run multiple servers simultaneously in Go?
+You can run multiple servers simultaneously in Go by using Go routines, which allow concurrent execution. Create a function for each server and launch them using go keyword, ensuring each server runs on a different port.
+
+
+Where are Go library dependencies stored after installation?
+In a Go temporary folder on the computer
