@@ -1,0 +1,15 @@
+What command is used to compile a Go project?
+go build . compiles the current project and generates an executable in the current folder
+
+How do you run a compiled Go executable?
+Use ./ followed by the executable name, such as ./museum on Linux/Mac or museum.exe on Windows
+
+What is the purpose of go install?
+go install makes a CLI application available in the terminal from anywhere by placing it in a folder that is in the system path
+
+What happens to assets like public folders when building a Go executable?
+Assets and public folders are not automatically embedded in the binary and remain separate from the executable
+
+How can you change the target OS and architecture during Go compilation?
+By setting environmental variables, you can compile for different operating systems and architectures, such as compiling a Windows executable from a Mac
+
